@@ -5,14 +5,17 @@ This file tracks the live-data sources intended for the NFL DFS engine and the c
 ## 1. Injuries
 
 ### nflverse
-Potentially useful fields include:
+Verified useful fields in the current Python pull include:
 - practice_status
 - report_status
 - report_primary_injury
-- date_modified
 - gsis_id
 
-Important caveat: nflverse's current release metadata exposes an injuries release and `load_injuries()` accepts current seasons, but the official nflverse update-schedule page still says the source died after 2024 and that 2025 data is unavailable. Treat current-season injury coverage as unverified until a direct pull confirms current 2026 records.
+A direct `nflreadpy==0.1.5` pull on 2026-09-18 returned 412 current-season rows covering Weeks 1 and 2 and all 32 teams. In that pull, `practice_status` was fully populated while `report_status` coverage was only about 16%.
+
+Important schema caveat: the current nflverse R injury dictionary documents a `date_modified` field, but the verified Python table did not contain `date_modified` or another update timestamp. Treat the actual runtime schema as authoritative and let the canary test alert us when this changes.
+
+Because the table has week-level rows without a reliable source timestamp, every live pull must be stamped by our pipeline and archived. Do not use final weekly injury rows as if they were guaranteed pre-lock snapshots for TNF historical backtests.
 
 ### Sleeper
 The public player endpoint includes fields such as:
@@ -24,9 +27,11 @@ The public player endpoint includes fields such as:
 Sleeper documents the player map as a once-per-day style endpoint and says the API is free for non-commercial use. Commercial use requires contacting Sleeper. Therefore it is not an automatic commercial fallback.
 
 ### Production rule
-Do not mark a player Out, Doubtful, Questionable, IR, PUP, or NFI from a stale cached source without recording the source timestamp.
+Use nflverse as a structured practice-status source, not as the sole final game-designation source.
 
-Near kickoff, official inactive status should supersede midweek practice/report information.
+Do not mark a player Out, Doubtful, Questionable, IR, PUP, or NFI from a stale cached source. Record our own retrieval timestamp and retain append-only snapshots.
+
+Near kickoff, a verified final game-status source and official inactive status should supersede midweek practice information.
 
 ## 2. DraftKings salary and player IDs
 
@@ -54,7 +59,9 @@ Use nflverse schedules for:
 - Vegas spread/total
 
 ### Forecast
-Use NWS / NOAA `api.weather.gov` for U.S. outdoor-stadium forecasts.
+Use NWS / NOAA `api.weather.gov` for current U.S. outdoor-stadium forecasts.
+
+Current-slate display is approved. Projection weight remains experimental until we possess timestamped historical pre-lock forecasts or an equivalent defensible archive.
 
 Recommended flow:
 1. static stadium latitude/longitude
@@ -64,7 +71,9 @@ Recommended flow:
 
 Use a descriptive User-Agent as required by NWS.
 
-Weather should contribute little or nothing when the roof is dome/closed.
+Weather should contribute nothing when the roof is dome/closed.
+
+Do not backfill a historical forecast feature with observed final weather. That would use realized information rather than what was knowable before lock.
 
 ## 4. Ownership
 
@@ -120,3 +129,23 @@ DK GameCenter post-lock CSVs
 ## 6. Rule
 
 Every live feature must carry an as-of timestamp or source vintage when practical. If historical backtesting cannot reproduce what was knowable before slate lock, the feature is not eligible for production evaluation.
+
+
+## 7. Executable source canaries
+
+Data-source claims that can be checked mechanically live in `tests/test_data_availability.py`.
+
+Current canaries cover:
+- current-season injury availability
+- missing injury timestamps in the actual Python schema
+- injury game-status coverage
+- live participation unavailability
+- historical participation availability
+- FTN versus PBP freshness
+- required FTN fields
+- U/S/P quarterback-location codes
+- forward Vegas line availability
+- separation of pre-game `total_line` from post-game `total` / `result`
+- data-vintage recording
+
+When a canary fails because a source improves or changes, update the implementation and this document together.
