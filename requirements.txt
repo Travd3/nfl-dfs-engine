@@ -1,0 +1,5 @@
+nflreadpy
+polars
+numpy
+scikit-learn
+scipy
