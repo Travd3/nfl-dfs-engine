@@ -1,0 +1,140 @@
+# NFL DFS Engine
+
+A research-first NFL Daily Fantasy Sports project focused on DraftKings Classic.
+
+The goal is to build a transparent DFS engine that separates football analysis from unsupported storytelling. Features only receive projection weight after they improve held-out performance.
+
+## Current state
+
+The repository currently contains the rebuilt analytical foundation from the first scheme-model audit.
+
+The current pipeline:
+
+1. Builds clean opportunity tables
+2. Separates player opportunity types into distinct analytical channels
+3. Constructs as-of-lock-time features
+4. Audits for data leakage
+5. Fits a baseline projection model
+6. Tests scheme features against the baseline
+7. Evaluates calibration and held-out accuracy
+8. Runs persistence and team-change diagnostics
+
+Current analytical channels:
+
+- QB passing
+- QB rushing
+- RB rushing
+- RB receiving
+- WR/TE receiving
+
+These channels are never pooled.
+
+## Important current finding
+
+Player-level scheme sensitivity currently receives **zero DFS projection weight**.
+
+In the current walk-forward test, the scheme sensitivity feature performed worse than the baseline out of sample. Team tendencies can still be used descriptively, but they do not currently alter DFS projections.
+
+The larger unresolved issue is the baseline itself. Baseline V1 is effectively tied with naive scoring persistence, so projection quality needs to improve before more advanced contest modeling can be trusted.
+
+See [PROJECT_SPEC.md](PROJECT_SPEC.md) for the current source of truth.
+
+## Files
+
+- `build_tables.py`  
+  Builds the five clean opportunity channels and player/team game tables.
+
+- `features.py`  
+  Builds as-of-lock-time player, team, opponent, Vegas, and scheme features.
+
+- `audit_leakage.py`  
+  Verifies source lags and checks for future or post-game information.
+
+- `model.py`  
+  Fits Baseline V1 and the experimental scheme model.
+
+- `evaluate.py`  
+  Reports held-out accuracy, calibration, bootstrap intervals, and slices.
+
+- `ablation.py`  
+  Compares the baseline against team rates, player sensitivity, combined scheme, and noise-control arms.
+
+- `diagnostics.py`  
+  Tests team tendency persistence, player sensitivity persistence, and player team-change effects.
+
+## Setup
+
+Use Python 3.11 or newer if possible.
+
+```bash
+python -m venv .venv
+```
+
+Activate the environment, then install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+## Run order
+
+Run the pipeline from the repository root:
+
+```bash
+python build_tables.py
+python features.py
+python audit_leakage.py
+python model.py
+python evaluate.py
+python ablation.py
+python diagnostics.py
+```
+
+Generated tables are written to `tables/` and are ignored by Git.
+
+## Data philosophy
+
+Current free-data stack:
+
+- nflverse / nflreadpy play-by-play
+- FTN charting subset through nflverse
+- Next Gen Stats where useful
+- schedules and Vegas lines
+- rosters, snaps, and depth data when verified
+- DraftKings official salary CSV when the live slate pipeline is added
+
+Historical participation/personnel data is not treated as a live 2026 feature.
+
+The project does not claim access to paid fields such as:
+
+- route participation
+- man/zone coverage
+- coverage shells
+- slot/wide/inline alignment
+- proprietary OL/DL grades
+- true called run concept
+- true receiver first-read share
+
+## Project rules
+
+1. AI explains the calculations. AI does not invent projections.
+2. A feature does not earn projection weight because it sounds smart.
+3. Historical tests must reproduce only the information available before that slate locked.
+4. Production, experimental, descriptive, and unsupported features must remain clearly separated.
+5. Free-data limitations must be visible rather than hidden.
+6. DFS comes first. Dynasty and weekly redraft are future products built from the same data layer.
+
+## Not yet in this repository
+
+The previously referenced `dfs_week2.py` optimizer/simulator file is not currently present in this repository.
+
+Future major components still to build include:
+
+- improved production projection model
+- DraftKings salary/player-ID ingest
+- verified live injury/status ingest
+- game simulation
+- contest simulation
+- ownership model
+- GPP portfolio optimizer
+- frontend / research desk
