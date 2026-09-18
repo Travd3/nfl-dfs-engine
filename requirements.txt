@@ -1,5 +1,6 @@
-nflreadpy
-polars
-numpy
-scikit-learn
-scipy
+nflreadpy==0.1.5
+polars==1.44.2
+numpy==2.4.4
+scikit-learn==1.8.0
+scipy==1.17.1
+pytest>=8.0
