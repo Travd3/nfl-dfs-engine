@@ -65,7 +65,7 @@ def build():
 
     base = ["game_id", "play_id", "season", "week", "posteam", "defteam",
             "down", "ydstogo", "yardline_100", "score_differential", "wp",
-            "half_seconds_remaining", "qtr", "charted"] +            ["is_motion", "is_play_action", "is_rpo", "is_screen_pass", "is_no_huddle",
+            "half_seconds_remaining", "qtr", "charted"] + \\\n           ["is_motion", "is_play_action", "is_rpo", "is_screen_pass", "is_no_huddle",
             "align_under", "align_shotgun", "align_pistol",
             "n_defense_box", "n_blitzers", "n_pass_rushers"]
 
