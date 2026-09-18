@@ -52,14 +52,23 @@ The natural-language layer explains model output. It does not generate the model
 ### Live DFS input decisions
 
 #### Injuries
-**Status: VERIFY BEFORE PRODUCTION.**
+**Status: PARTIALLY VERIFIED. PRODUCTION FOR PRACTICE STATUS, NOT SUFFICIENT ALONE FOR GAME STATUS.**
 
-nflverse currently exposes an `injuries` release and `load_injuries()`, but its official update-schedule page still states that the injury source died after 2024 and that no 2025 data is available. Because those primary nflverse sources conflict, the live pipeline must not assume current-season injury coverage until a direct 2026 pull is checked for recent week/date records.
+A direct 2026 `nflreadpy==0.1.5` pull on 2026-09-18 returned current-season injury rows for Weeks 1 and 2 across all 32 teams. This proves the live release is flowing even though the nflverse update-schedule prose still says the old injury source died after 2024.
 
-Preferred structure once verified:
-- nflverse injury reports as the structured historical/practice-status store
-- official roster status for IR/PUP/NFI
-- official inactive list near kickoff when available
+The important limitation is coverage:
+- `practice_status` is populated broadly enough to use as a live practice-participation feature.
+- `report_status` (Out/Doubtful/Questionable) was populated on only about 16% of the current rows in the verified pull, so nflverse cannot be treated as the sole Sunday game-status source.
+- the actual Python table contained no usable source-update timestamp. The current nflverse R dictionary still documents `date_modified`, so schema reality and documentation conflict.
+
+Production rule:
+- stamp every injury pull with our own retrieval timestamp and archive snapshots append-only
+- use nflverse for structured practice status
+- use roster status for IR/PUP/NFI
+- add a separate verified source for final Out/Doubtful/Questionable designations and official inactives
+- exclude TNF injury features from historical backtests until pre-lock snapshots exist, because a weekly row may reflect information added after Thursday kickoff
+
+These claims are guarded by `tests/test_data_availability.py`.
 
 Sleeper may be useful as a same-day overlay, but its public API documentation says free use is for non-commercial purposes and commercial use requires contacting Sleeper. Do not make Sleeper a commercial product dependency without permission.
 
@@ -76,13 +85,17 @@ Use the official DraftKings lobby/lineup-template CSV supplied to the logged-in 
 Do not make the undocumented DraftKings draftables API a production dependency.
 
 #### Weather
-**Status: PRODUCTION INPUT.**
+**Status: EXPERIMENTAL FOR MODEL WEIGHT; LIVE NWS FEED APPROVED FOR CURRENT-SLATE DISPLAY.**
 
 Use:
 - nflverse schedules for roof/surface/game metadata and Vegas lines
-- NWS / NOAA `api.weather.gov` for outdoor-stadium forecast data
+- NWS / NOAA `api.weather.gov` for current outdoor-stadium forecast data
 
-NWS is free public U.S. government data and requires a descriptive User-Agent. Weather should be ignored or strongly downweighted for dome/closed-roof games.
+NWS is a clean live source, but its forecast endpoint is not a historical archive of what a forecast said before a past slate locked. Therefore weather cannot receive production projection weight under the project's leakage rule until we either:
+- accumulate our own timestamped forecast archive, or
+- build a defensible historical forecast/reanalysis pipeline and prove it represents pre-lock information.
+
+Observed final weather must not be substituted for historical pre-lock forecasts. Dome/closed-roof games receive no weather adjustment.
 
 #### Ownership
 **Status: MODEL INTERNALLY. NO OFFICIAL FREE PRE-LOCK FEED.**
@@ -431,9 +444,9 @@ No AI should silently create a separate competing architecture.
 - No production DraftKings optimizer is currently committed here.
 - No contest simulator is currently committed here.
 - No ownership model is currently committed here.
-- No verified live injury pipeline is currently committed here.
+- Injury practice-status data is verified live, but final game-status/inactive sourcing and timestamped snapshot archiving are not yet implemented.
 - No frontend is currently committed here.
-- Current FTN publication lag assumption needs ongoing measurement.
+- Current FTN publication lag assumption needs ongoing measurement; data-availability canaries now monitor it.
 - Current route-level information is unavailable in the free stack.
 - Current baseline projection is not yet demonstrably better than naive persistence.
 
