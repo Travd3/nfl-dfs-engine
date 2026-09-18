@@ -30,3 +30,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Runtime source-vintage snapshot
+data_vintage.json
