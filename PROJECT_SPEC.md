@@ -49,6 +49,50 @@ The natural-language layer explains model output. It does not generate the model
 - rosters and depth-chart data when verified
 - DraftKings official lobby CSV for salaries and player IDs when live slate ingestion is implemented
 
+### Live DFS input decisions
+
+#### Injuries
+**Status: VERIFY BEFORE PRODUCTION.**
+
+nflverse currently exposes an `injuries` release and `load_injuries()`, but its official update-schedule page still states that the injury source died after 2024 and that no 2025 data is available. Because those primary nflverse sources conflict, the live pipeline must not assume current-season injury coverage until a direct 2026 pull is checked for recent week/date records.
+
+Preferred structure once verified:
+- nflverse injury reports as the structured historical/practice-status store
+- official roster status for IR/PUP/NFI
+- official inactive list near kickoff when available
+
+Sleeper may be useful as a same-day overlay, but its public API documentation says free use is for non-commercial purposes and commercial use requires contacting Sleeper. Do not make Sleeper a commercial product dependency without permission.
+
+#### DraftKings salaries and IDs
+**Status: PRODUCTION INPUT.**
+
+Use the official DraftKings lobby/lineup-template CSV supplied to the logged-in user. It is the source of truth for:
+- slate membership
+- salary
+- roster position
+- DraftKings player ID
+- team/game metadata
+
+Do not make the undocumented DraftKings draftables API a production dependency.
+
+#### Weather
+**Status: PRODUCTION INPUT.**
+
+Use:
+- nflverse schedules for roof/surface/game metadata and Vegas lines
+- NWS / NOAA `api.weather.gov` for outdoor-stadium forecast data
+
+NWS is free public U.S. government data and requires a descriptive User-Agent. Weather should be ignored or strongly downweighted for dome/closed-roof games.
+
+#### Ownership
+**Status: MODEL INTERNALLY. NO OFFICIAL FREE PRE-LOCK FEED.**
+
+Pre-lock ownership should be estimated internally from features such as salary, projection, value, implied team total, stack context, and injury-driven role changes.
+
+Post-lock DraftKings GameCenter CSV exports provide realized `% Drafted` and can be used as clean training/calibration data. DraftKings documentation states these exports can be downloaded for contests the user entered and also for viewable contests the user did not enter. Downloads remain available for a limited period after contests end, so archive selected contest CSVs weekly.
+
+Public article ownership percentages may be stored as timestamped calibration snapshots, but paid or paywalled ownership tables must not be scraped into the product.
+
 ### Historical-only or restricted-use sources
 
 Participation/personnel data from recent seasons may be useful for historical research or priors, but it is not a dependable live current-season input.
