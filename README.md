@@ -35,9 +35,15 @@ Player-level scheme sensitivity currently receives **zero DFS projection weight*
 
 In the current walk-forward test, the scheme sensitivity feature performed worse than the baseline out of sample. Team tendencies can still be used descriptively, but they do not currently alter DFS projections.
 
-Baseline V3 now implements the direct-ridge idea at player-game grain with rolling-origin validation, zero-opportunity active-roster rows, corrected FanDuel yardage bonuses, calibration diagnostics, and weekly-stat scoring targets. Under corrected scoring it still beats naive persistence on RMSE, but only marginally, and it loses slightly on rank correlation and MAE.
+Baseline V3 has now passed a fresh untouched historical confirmation on 2011-2017 and is the **interim production mean baseline**.
 
-The 2018-2023 block is no longer a pristine confirmatory holdout because the 2022 Taysom Hill failure directly motivated the current winsorization guard. V3 therefore remains the preferred research baseline, not yet a confirmed production model.
+Fresh confirmation:
+- RMSE: 5.6566 vs 5.6916 naive
+- RMSE delta: +0.0348
+- 95% CI: [+0.0102, +0.0606]
+- calibration slope: 1.029 vs 0.913 naive
+
+The caveat is important: the aggregate gain is driven by better handling of zero-opportunity rows. V3 remains worse than naive on played-player rows and slightly worse on MAE and rank correlation. That is the next modeling target, not a hidden limitation.
 
 See [PROJECT_SPEC.md](PROJECT_SPEC.md) for the current source of truth.
 
@@ -171,8 +177,8 @@ The previously referenced `dfs_week2.py` optimizer/simulator file is not current
 
 Future major components still to build include:
 
-- fresh untouched historical validation of frozen V3
-- availability hurdle-model test after V3 confirmation
+- live V3 inference for the 2026 FanDuel slate
+- availability / conditional-production model test against V3
 - FanDuel DEF projection path
 - DraftKings salary/player-ID ingest
 - verified final live injury/status ingest
