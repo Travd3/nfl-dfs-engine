@@ -35,7 +35,7 @@ Player-level scheme sensitivity currently receives **zero DFS projection weight*
 
 In the current walk-forward test, the scheme sensitivity feature performed worse than the baseline out of sample. Team tendencies can still be used descriptively, but they do not currently alter DFS projections.
 
-Baseline V2 research found a promising structural improvement: a direct ridge model on fantasy points outperformed the old role × efficiency product on held-out RMSE. The gain is small and is not yet considered production-ready because scoring is not yet platform-configurable, evaluation is still channel-level, zero-opportunity games are excluded, and the model-selection result needs confirmatory testing.
+Baseline V3 now implements the direct-ridge idea at player-game grain with rolling-origin validation and zero-opportunity active-roster rows. The first confirmatory run was encouraging, but it is still not production-ready because that run used zero FanDuel yardage bonuses. The actual Test Slate #1 rules show +3 bonuses at 300 passing, 100 rushing, and 100 receiving yards, so the metrics must be rerun under the corrected scoring target.
 
 See [PROJECT_SPEC.md](PROJECT_SPEC.md) for the current source of truth.
 
@@ -70,6 +70,18 @@ See [PROJECT_SPEC.md](PROJECT_SPEC.md) for the current source of truth.
 
 - `metric_choice.py`  
   Compares RMSE, MAE, and bias behavior across Baseline V2 arms.
+
+- `scoring.py`  
+  Holds platform scoring profiles. FanDuel Test Slate #1 core values are verified from the actual contest Rules screenshots.
+
+- `player_games.py`  
+  Builds final player-game scoring targets, retains zero-opportunity active-roster rows, and counts true distinct team plays.
+
+- `baseline_v3.py`  
+  Runs the direct ridge at player-game grain with rolling-origin validation.
+
+- `ingest_fanduel.py`  
+  Parses the official FanDuel upload template into a clean player pool without carrying user-specific entry/contest IDs into derived outputs.
 
 ## Setup
 
@@ -147,7 +159,9 @@ The project does not claim access to paid fields such as:
 
 ## Current platform note
 
-The football engine is being moved toward configurable scoring. The current historical research targets were built under the original full-PPR implementation, while Test Slate #1 is a FanDuel-style 0.5 PPR, $60,000 salary-cap contest. Historical scoring must be rebuilt from explicit platform rules before the test-slate projection is considered valid.
+The football engine now has configurable scoring. Test Slate #1 is a FanDuel 0.5 PPR, $60,000 salary-cap contest with +3 bonuses at 300 passing, 100 rushing, and 100 receiving yards.
+
+The current FanDuel profile is verified for those recorded values, but is still marked incomplete because rare player KR/PR return TDs and own-fumble-recovery TDs are not yet included in the historical skill-player target builder, and DEF is a separate model path.
 
 ## Not yet in this repository
 
@@ -155,9 +169,11 @@ The previously referenced `dfs_week2.py` optimizer/simulator file is not current
 
 Future major components still to build include:
 
-- improved production projection model
+- final V3 rerun under complete FanDuel scoring
+- availability hurdle-model test
+- FanDuel DEF projection path
 - DraftKings salary/player-ID ingest
-- verified live injury/status ingest
+- verified final live injury/status ingest
 - game simulation
 - contest simulation
 - ownership model
