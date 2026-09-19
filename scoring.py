@@ -1,8 +1,10 @@
 """
 Configurable fantasy scoring.
 
-The actual FanDuel Test Slate #1 contest screenshots settle the core scoring
-rules used here, including the yardage bonuses:
+Scoring is a pure function of counting stats, so a platform is a config entry
+rather than a table rebuild.
+
+FanDuel Test Slate #1 rules are VERIFIED from the contest rules screenshots:
   300+ passing yards: +3
   100+ rushing yards: +3
   100+ receiving yards: +3
@@ -10,13 +12,18 @@ rules used here, including the yardage bonuses:
   fumbles lost: -2
   successful two-point conversion pass: +2
   successful two-point conversion scored: +2
+  kickoff return touchdown: +6
+  punt return touchdown: +6
+  own fumble recovered touchdown: +6
 
-`verified` means the values in the profile were read from an authoritative
-source for this specific contest. `complete` is stricter: every scoring
-category shown by the contest must also be represented in the historical stat
-builder. The FanDuel profile is verified but not yet complete because historical
-player kick/punt return TDs and own-fumble-recovery TDs still need to be added,
-and DEF is modeled separately.
+Important distinction:
+  verified=True means the contest rule values themselves are verified.
+  complete=True means the historical target builder represents every listed
+  category with sufficiently exact source semantics.
+
+The FanDuel profile remains complete=False because the current weekly-stat
+proxies for rare return TDs and fumble-recovery TDs are broader than the exact
+contest definitions. Defense/special-teams UNIT scoring is separate.
 """
 from dataclasses import dataclass, asdict
 
@@ -34,6 +41,8 @@ class Scoring:
     rec_td: float
     fumble_lost: float
     two_pt: float
+    return_td: float = 0.0
+    fumble_recovery_td: float = 0.0
     bonus_pass_yd: float = 0.0
     bonus_pass_threshold: float = 300.0
     bonus_rush_yd: float = 0.0
@@ -54,9 +63,11 @@ DK_CLASSIC = Scoring(
     rush_yd=0.1, rush_td=6.0,
     reception=1.0, rec_yd=0.1, rec_td=6.0,
     fumble_lost=-1.0, two_pt=2.0,
+    return_td=6.0, fumble_recovery_td=6.0,
     bonus_pass_yd=3.0, bonus_rush_yd=3.0, bonus_rec_yd=3.0,
     verified=False, complete=False,
-    source="DraftKings profile still requires direct rules verification.",
+    source="Comparison profile only; not yet directly verified against the "
+           "current DraftKings rules page.",
 )
 
 FANDUEL_TEST_SLATE_1 = Scoring(
@@ -65,14 +76,38 @@ FANDUEL_TEST_SLATE_1 = Scoring(
     rush_yd=0.1, rush_td=6.0,
     reception=0.5, rec_yd=0.1, rec_td=6.0,
     fumble_lost=-2.0, two_pt=2.0,
+    return_td=6.0, fumble_recovery_td=6.0,
     bonus_pass_yd=3.0, bonus_rush_yd=3.0, bonus_rec_yd=3.0,
     verified=True, complete=False,
     source="Actual FanDuel Test Slate #1 contest Rules screenshots supplied "
-           "2026-09-18. Historical builder still lacks rare player KR/PR TD "
-           "and own-fumble-recovery TD categories; DEF is separate.",
+           "2026-09-18. Rule values are verified. Historical target mapping "
+           "for rare return-TD and own-fumble-recovery-TD categories remains "
+           "approximate; DEF unit scoring is separate.",
 )
 
 PROFILES = {p.name: p for p in (DK_CLASSIC, FANDUEL_TEST_SLATE_1)}
+
+FANDUEL_SKILL_CATEGORIES = {
+    "passing yards":                 ("pass_yd", "pass_yds"),
+    "passing touchdown":             ("pass_td", "pass_tds"),
+    "interception thrown":           ("interception", "ints"),
+    "rushing yards":                 ("rush_yd", "rush_yds"),
+    "rushing touchdown":             ("rush_td", "rush_tds"),
+    "reception":                     ("reception", "receptions"),
+    "receiving yards":               ("rec_yd", "rec_yds"),
+    "receiving touchdown":           ("rec_td", "rec_tds"),
+    "fumble lost":                   ("fumble_lost", "fumbles_lost"),
+    "two point conversion":          ("two_pt", "two_pts"),
+    "kickoff/punt return touchdown": ("return_td", "return_tds"),
+    "own fumble recovery touchdown": ("fumble_recovery_td", "fumble_rec_tds"),
+    "300 passing yard bonus":        ("bonus_pass_yd", "pass_yds"),
+    "100 rushing yard bonus":        ("bonus_rush_yd", "rush_yds"),
+    "100 receiving yard bonus":      ("bonus_rec_yd", "rec_yds"),
+}
+
+STAT_COLS = ["pass_yds", "pass_tds", "ints", "rush_yds", "rush_tds",
+             "receptions", "rec_yds", "rec_tds", "fumbles_lost", "two_pts",
+             "return_tds", "fumble_rec_tds"]
 
 
 def get(name):
@@ -82,7 +117,7 @@ def get(name):
 
 
 def score_expr(profile):
-    """Polars expression scoring the currently implemented skill-player stats."""
+    """Polars expression scoring one player-game stat row under `profile`."""
     import polars as pl
     p = profile
     base = (
@@ -96,6 +131,8 @@ def score_expr(profile):
         + pl.col("rec_tds") * p.rec_td
         + pl.col("fumbles_lost") * p.fumble_lost
         + pl.col("two_pts") * p.two_pt
+        + pl.col("return_tds") * p.return_td
+        + pl.col("fumble_rec_tds") * p.fumble_recovery_td
     )
     bonus = (
         pl.when(pl.col("pass_yds") >= p.bonus_pass_threshold)
@@ -106,7 +143,3 @@ def score_expr(profile):
             .then(p.bonus_rec_yd).otherwise(0.0)
     )
     return (base + bonus).alias("fpts")
-
-
-STAT_COLS = ["pass_yds", "pass_tds", "ints", "rush_yds", "rush_tds",
-             "receptions", "rec_yds", "rec_tds", "fumbles_lost", "two_pts"]
