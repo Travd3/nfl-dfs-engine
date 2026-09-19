@@ -12,9 +12,11 @@ Initial platform targets:
 The football projection layer must be platform-agnostic. Platform scoring, salary cap, roster slots, and contest rules belong in explicit contest/scoring configuration rather than being hardcoded into the model.
 
 ### Scoring shape
-The current historical research tables were originally built with full-PPR skill-player scoring and therefore do **not** yet represent the FanDuel Test Slate #1 scoring shown in the live contest.
+Scoring is now platform-configurable and applied at player-game level.
 
-Before a projection is used for the FanDuel test contest, scoring must be rebuilt from a FanDuel configuration, including 0.5 PPR, yardage bonuses, turnovers, two-point conversions, and all applicable defense/special-teams scoring. Bonuses and other game-level rules belong at player-game or simulation level rather than per-opportunity features.
+FanDuel Test Slate #1 is the **2026-09-20 Week 2, 13-game Sunday main slate** from the official FanDuel upload template. It uses 0.5 PPR, the verified yardage bonuses and turnover/two-point rules already recorded in `scoring.py`.
+
+The historical skill-player target is usable for projection research but remains `complete=False` because the rare `special_teams_tds` and `fumble_recovery_tds` source fields are not semantically identical to FanDuel's narrower return-TD / own-fumble-recovery-TD wording. DEF scoring is a separate model path.
 
 ### Long-term system
 
@@ -221,7 +223,7 @@ Historical backtests must reproduce what was knowable before each slate locked.
 - play-by-play history: 1 week
 - FTN charting history: 1 week as of the 2026-09-19 source vintage
 
-The FTN lag is not a permanent constant. On 2026-09-18 FTN trailed PBP by one completed week, while on 2026-09-19 the live canary observed both sources through Week 2 before the Week 3 Sunday lock. The canary now converts the observed source gap into the required declared lag and fails on any mismatch.
+The FTN lag is not a permanent constant. On 2026-09-18 FTN trailed PBP by one completed week. On 2026-09-19 both sources contained Week 2 rows before the Week 2 Sunday lock, but that includes a partially played week and does **not** prove that full Week 2 charting will be available for Week 3. The current Week 2 live projection does not use FTN scheme inputs. Re-verify full prior-week coverage before using a one-week charting lag in a future live scheme feature.
 
 ### Forbidden leakage
 
@@ -631,6 +633,7 @@ No AI should silently create a separate competing architecture.
 - FanDuel rule values are verified, but historical target completeness remains false because `special_teams_tds` is broader than kickoff/punt return TDs and `fumble_recovery_tds` cannot isolate own recoveries.
 - FanDuel DEF scoring/projection is not yet implemented.
 - The official FanDuel Test Slate #1 player pool is available through the upload-template ingest path.
+- `live_projection.py` is committed for Week 2 live QB/RB/WR/TE inference, including a fully-completed-week training guard. Final FanDuel mapping coverage still needs a run against the official slate CSV.
 
 ---
 
