@@ -35,7 +35,7 @@ import polars as pl
 import nflreadpy as nfl
 import scoring
 
-SEASONS = list(range(2016, 2026))
+SEASONS = list(range(2009, 2026))  # 2003-2008 targets unusable
 POS = ["QB", "RB", "WR", "TE"]
 
 
@@ -72,8 +72,15 @@ def weekly_stats(seasons=SEASONS):
 
 def team_play_counts(seasons=SEASONS):
     """Distinct offensive pass/run plays per team-week."""
+    import gc, os
     out = []
     for s in seasons:
+        # cached per season: holding many seasons of play-by-play at once
+        # exhausts memory on a 4 GB container. Pure I/O change, same counts.
+        cache = f"tables/tp/{s}.parquet"
+        if os.path.exists(cache):
+            out.append(pl.read_parquet(cache))
+            continue
         p = nfl.load_pbp([s])
         out.append(p.filter(pl.col("play_type").is_in(["pass", "run"])
                             & pl.col("posteam").is_not_null())
@@ -81,6 +88,10 @@ def team_play_counts(seasons=SEASONS):
                     .unique(subset=["game_id", "play_id"])
                     .group_by(["season", "week", pl.col("posteam").alias("team")])
                     .agg(pl.len().alias("team_plays")))
+        # release the season's play-by-play before loading the next one;
+        # 17 seasons held simultaneously exhausts memory. Aggregates only.
+        del p
+        gc.collect()
     return pl.concat(out, how="diagonal_relaxed")
 
 
