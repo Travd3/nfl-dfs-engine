@@ -1,0 +1,30 @@
+name: Unit tests
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "*.py"
+      - "tests/**"
+      - "requirements.txt"
+      - ".github/workflows/unit-tests.yml"
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run deterministic unit tests
+        run: pytest tests/test_scoring.py -v
