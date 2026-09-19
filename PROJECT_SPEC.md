@@ -369,6 +369,52 @@ The historical FanDuel scoring rules are verified, but the target remains
 `complete=False` because `special_teams_tds` is broader than only kickoff/punt
 return touchdowns and `fumble_recovery_tds` cannot isolate own recoveries.
 Those rare semantic gaps are documented rather than hidden.
+
+### Availability hurdle experiment
+
+Issue #2 tested:
+
+```text
+E[points] = P(record an opportunity) × E[points | opportunity]
+```
+
+The experiment imported frozen V3's frame, features, winsorization, minimum-history
+filter, rolling-origin splits, and scoring profile unchanged. Only the estimator
+differed.
+
+Fresh 2011-2017 block:
+
+```text
+arm          RMSE      MAE   Spearman      bias
+naive      5.6916   3.5670     0.6533   +0.0343
+v3         5.6566   3.6004     0.6505   -0.1246
+hurdle     5.6765   3.6315     0.6541   -0.0800
+
+V3 -> hurdle RMSE delta -0.0199
+95% CI [-0.0288, -0.0113]
+```
+
+The hurdle model is **REJECTED**. It is significantly worse than V3 on both RMSE
+and MAE and does not cleanly beat naive persistence on RMSE.
+
+The useful diagnostic is the conditional production component trained only on
+played rows. On played rows it reported RMSE 6.4876 versus 6.8188 for V3, a
++0.3319 improvement with 95% CI [+0.3002, +0.3649], while largely removing V3's
+negative played-row bias.
+
+That conditional result is **EXPERIMENTAL / DIAGNOSTIC ONLY**. It does not by
+itself produce a full-slate mean projection, and the 2011-2017 block has now
+been consumed by model experimentation. Do not keep testing new arms on that
+block and call them independently confirmed.
+
+Current lesson:
+- forced multiplication of separately estimated components has failed twice
+  in this project
+- availability information may still be useful as an input to a direct points
+  model rather than as a multiplicative discount
+- any next variant must be pre-registered and evaluated without reusing the
+  2011-2017 block as a fresh confirmation set
+
 ---
 
 ## 8. Baseline model status
@@ -401,20 +447,16 @@ Why it is still only interim:
 - it is worse than naive persistence on played-player rows
 - it is not an outcome-distribution, ceiling, or contest-win model
 
-### Next modeling question
-Issue #2 is now unblocked: test an availability hurdle model and/or conditional
-production model without sacrificing the validated availability advantage.
+### Issue #2 result
+The multiplicative availability hurdle is **REJECTED** and frozen V3 remains the
+interim production mean baseline.
 
-Candidate structure:
+The played-only conditional ridge is a strong research signal, but it is not a
+replacement model. Future work may test availability probability as a feature
+inside a direct points model or another non-multiplicative structure.
 
-```text
-P(records opportunity / plays)
-    ×
-E[points | plays]
-```
-
-The candidate must beat frozen V3 on held-out data and must report played,
-zero-opportunity, and DFS-relevant ranking slices separately.
+That research is **non-blocking for Test Slate #1**. The immediate product path is
+live inference, DEF, optimizer, and the minimal test interface.
 
 ---
 
@@ -444,10 +486,12 @@ RMSE is only an interim metric for point projections. It is not the final tourna
 ### Immediate
 1. Build live V3 inference for the official FanDuel Test Slate #1 player pool.
 2. Add a FanDuel DEF mean projection/scoring path.
-3. Test Issue #2 availability/conditional-production improvements against frozen V3.
-4. Build the first salary-cap optimizer for the 9-player, $60,000 FanDuel roster.
-5. Build a minimal test interface that shows projections, salary, value, and the recommended lineup.
-6. Complete reliable final game-status/inactive sourcing before Sunday lock.
+3. Build the first salary-cap optimizer for the 9-player, $60,000 FanDuel roster.
+4. Build a minimal test interface that shows projections, salary, value, and the recommended lineup.
+5. Complete reliable final game-status/inactive sourcing before Sunday lock.
+
+Conditional played-player modeling remains a parallel research task and must not
+delay the first live Sunday test.
 
 ### After baseline improvement
 4. Add defensive contextual features only if they pass held-out tests.
@@ -582,7 +626,8 @@ No AI should silently create a separate competing architecture.
 - FTN publication lag is source-vintage dependent; the live canary currently supports a 1-week lag and will fail when the observed gap changes.
 - Current route-level information is unavailable in the free stack.
 - Direct-ridge Baseline V3 has passed a fresh 2011-2017 RMSE confirmation and is the interim production mean baseline.
-- V3's gain is concentrated in zero-opportunity rows; it remains worse than naive on played rows and slightly worse on rank correlation, so conditional production/ranking still needs improvement.
+- V3's gain is concentrated in zero-opportunity rows; it remains worse than naive on played rows and slightly worse on rank correlation.
+- The multiplicative availability hurdle was tested and rejected. A played-only conditional ridge showed a large diagnostic improvement, but no validated full-slate replacement model exists yet.
 - FanDuel rule values are verified, but historical target completeness remains false because `special_teams_tds` is broader than kickoff/punt return TDs and `fumble_recovery_tds` cannot isolate own recoveries.
 - FanDuel DEF scoring/projection is not yet implemented.
 - The official FanDuel Test Slate #1 player pool is available through the upload-template ingest path.
