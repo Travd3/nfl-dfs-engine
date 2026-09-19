@@ -12,9 +12,12 @@ failure is the notification.
 
 Run:  pytest tests/test_data_availability.py -v
 """
+import os, sys
 import pytest
 import polars as pl
 import nflreadpy as nfl
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from features import CHART_LAG
 
 SEASON = nfl.get_current_season()
