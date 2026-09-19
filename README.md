@@ -43,7 +43,9 @@ Fresh confirmation:
 - 95% CI: [+0.0102, +0.0606]
 - calibration slope: 1.029 vs 0.913 naive
 
-The caveat is important: the aggregate gain is driven by better handling of zero-opportunity rows. V3 remains worse than naive on played-player rows and slightly worse on MAE and rank correlation. That is the next modeling target, not a hidden limitation.
+The caveat is important: the aggregate gain is driven by better handling of zero-opportunity rows. V3 remains worse than naive on played-player rows and slightly worse on MAE and rank correlation.
+
+A multiplicative availability hurdle was tested and rejected. Its conditional played-only component was much stronger on played rows, which is a useful research signal, but the product model was worse than V3 overall. That research will continue separately and will not block the first live FanDuel test.
 
 See [PROJECT_SPEC.md](PROJECT_SPEC.md) for the current source of truth.
 
@@ -178,7 +180,7 @@ The previously referenced `dfs_week2.py` optimizer/simulator file is not current
 Future major components still to build include:
 
 - live V3 inference for the 2026 FanDuel slate
-- availability / conditional-production model test against V3
+- non-multiplicative conditional-production research after the first live test
 - FanDuel DEF projection path
 - DraftKings salary/player-ID ingest
 - verified final live injury/status ingest
