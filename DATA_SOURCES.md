@@ -149,3 +149,14 @@ Current canaries cover:
 - data-vintage recording
 
 When a canary fails because a source improves or changes, update the implementation and this document together.
+
+
+## 8. FTN source-vintage lag
+
+FTN charting freshness is monitored live rather than treated as a permanent fixed delay.
+
+Observed vintages:
+- 2026-09-18: PBP through Week 2, FTN through Week 1
+- 2026-09-19: PBP through Week 2, FTN through Week 2 before the Week 3 Sunday lock
+
+The feature builder currently uses `CHART_LAG = 1`. The data-availability canary computes the lag implied by the live source gap and fails whenever code and source reality diverge.
