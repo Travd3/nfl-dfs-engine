@@ -3,10 +3,18 @@
 ## 1. Product
 
 ### Product 1
-DraftKings NFL Classic DFS optimizer and slate simulator.
+NFL salary-cap DFS projection, simulation, and lineup engine.
+
+Initial platform targets:
+- DraftKings Classic
+- FanDuel NFL salary-cap contests
+
+The football projection layer must be platform-agnostic. Platform scoring, salary cap, roster slots, and contest rules belong in explicit contest/scoring configuration rather than being hardcoded into the model.
 
 ### Scoring shape
-Full PPR with DraftKings-specific scoring handled at the appropriate level, including yardage bonuses inside game or player-game simulation rather than per-play features.
+The current historical research tables were originally built with full-PPR skill-player scoring and therefore do **not** yet represent the FanDuel Test Slate #1 scoring shown in the live contest.
+
+Before a projection is used for the FanDuel test contest, scoring must be rebuilt from a FanDuel configuration, including 0.5 PPR, yardage bonuses, turnovers, two-point conversions, and all applicable defense/special-teams scoring. Bonuses and other game-level rules belong at player-game or simulation level rather than per-opportunity features.
 
 ### Long-term system
 
@@ -232,9 +240,8 @@ All as-of joins should preserve enough source timing information to be audited.
 
 ## 7. Current backtest result
 
-Current walk-forward evaluation uses prior seasons to predict held-out 2024 and 2025 player-game-channel outcomes.
-
-Reported result from the current research pass:
+### Scheme pass
+The first walk-forward pass used prior seasons to predict held-out 2024 and 2025 player-game-channel outcomes:
 
 ```text
 arm                MAE
@@ -247,46 +254,70 @@ noise control   4.1216
 ```
 
 Interpretation:
+- Baseline V1 was effectively tied with naive persistence.
+- Team scheme rates did not provide reliable improvement.
+- Player sensitivity was harmful out of sample.
+- Scheme therefore has zero projection weight.
 
-- Baseline V1 is effectively tied with naive persistence.
-- Team scheme rates do not provide reliable improvement.
-- Player sensitivity is harmful out of sample.
-- Scheme therefore has zero projection weight in the current DFS model.
+### Baseline V2 research pass
+Claude's second walk-forward pass tested structural alternatives:
 
-The exact results should be reproducible from the committed pipeline before they are treated as canonical.
+```text
+arm     MAE      RMSE
+naive   4.1260   5.5998
+v1      4.1254   5.5862
+v2a     4.1231   5.5774
+v2b     4.1318   5.5706
+v2c     4.1421   5.5653
+v2d     4.1855   5.6394
+v2e     3.9751   5.6873
+```
+
+The promising structural finding is that a **direct ridge model on fantasy points using the original feature set** reportedly reached RMSE 5.5615 versus 5.5998 for naive persistence, with a block-bootstrap delta of +0.0379 and reported 95% CI [+0.0133, +0.0624].
+
+This is **PROMISING / NOT YET PRODUCTION**.
+
+Reasons it is not yet production:
+- the reported V3/direct-old model is not yet a standalone reproducible production file
+- model choice was informed by performance on the same 2024-2025 evaluation seasons, so a confirmatory backtest is required
+- evaluation is currently on player-game-channel rows, not final player-game fantasy totals
+- the frame excludes player-games with zero opportunities, so availability/zero outcomes are not represented
+- current historical targets still use the original scoring implementation, which does not match FanDuel Test Slate #1 and omits some full platform scoring details
+- the direct model must be re-evaluated after scoring is made configurable
+
+The main structural conclusion is still useful: independently fitting opportunities and points per opportunity and multiplying them appears to compound error relative to a direct points model.
+
+The exact results must remain reproducible from committed code and should be confirmed on a broader rolling historical sample.
 
 ---
 
 ## 8. Baseline model status
 
-### Current Baseline V1
-Role and efficiency are modeled separately, then multiplied.
+### Baseline V1
+Role and efficiency were modeled separately, then multiplied.
 
-Conceptually:
+That structure is interpretable, but held-out testing indicates that independently estimating the two components compounds variance.
 
-```text
-expected opportunities
-    x
-expected points per opportunity
-    =
-expected fantasy points
-```
+### Baseline V2 finding
+The best current research direction is a **single direct ridge model on fantasy points using the original baseline features**.
 
-This structure is interpretable, but current results suggest that independently estimating the two pieces may compound variance.
+Extra V2 features tested:
+- snap share
+- red-zone opportunity/share
+- team pace proxy
+- rest
+- home/away
+
+These extra features are currently **REJECTED** for projection weight because they did not improve the direct model in the reported held-out test.
 
 ### Current highest-priority modeling question
+Can the direct-ridge result survive a confirmatory test once:
+1. scoring is configurable and matches the target platform,
+2. predictions are evaluated at final player-game fantasy-point level,
+3. zero-opportunity / inactive outcomes are represented,
+4. a broader rolling historical sample is used?
 
-Can a stronger production projection materially beat naive player scoring persistence?
-
-Candidate next approaches:
-
-- direct player-points model with role features as inputs
-- two-part role/efficiency model with estimated dependence between components
-- hierarchical or empirical-Bayes role priors
-- more explicit team-volume modeling
-- better opportunity-state updating across early-season weeks
-
-Do not add more advanced DFS layers until the baseline projection is meaningfully measurable.
+Until that is done, the direct ridge is the preferred research baseline but not yet a production projection.
 
 ---
 
@@ -294,8 +325,8 @@ Do not add more advanced DFS layers until the baseline projection is meaningfull
 
 Any model change should report:
 
-1. held-out MAE
-2. held-out RMSE
+1. held-out RMSE as the primary interim point-projection metric
+2. held-out MAE as a secondary diagnostic
 3. rank correlation
 4. calibration
 5. bootstrap confidence interval for improvement
@@ -307,14 +338,17 @@ Any model change should report:
 
 Bootstrap should resample slate-weeks or another appropriately correlated block rather than treating every player-row as independent.
 
+RMSE is only an interim metric for point projections. It is not the final tournament objective. Once outcome distributions exist, use proper distributional calibration/scoring and contest-level simulation metrics rather than selecting models on RMSE alone.
+
 ---
 
 ## 10. DFS roadmap
 
 ### Immediate
-1. Improve the baseline projection model.
-2. Add official DraftKings salary/player-ID CSV ingest.
-3. Verify and add a reliable live injury/status source.
+1. Make scoring/roster rules configurable and add the FanDuel Test Slate #1 profile.
+2. Rebuild and confirm the direct-ridge baseline at player-game level under correct scoring.
+3. Add official platform salary/player-ID ingest for the target slate.
+4. Complete reliable final game-status/inactive sourcing.
 
 ### After baseline improvement
 4. Add defensive contextual features only if they pass held-out tests.
@@ -448,7 +482,9 @@ No AI should silently create a separate competing architecture.
 - No frontend is currently committed here.
 - Current FTN publication lag assumption needs ongoing measurement; data-availability canaries now monitor it.
 - Current route-level information is unavailable in the free stack.
-- Current baseline projection is not yet demonstrably better than naive persistence.
+- Direct-ridge baseline is promising versus naive persistence by channel-level RMSE, but still requires confirmatory player-game and platform-correct scoring validation.
+- Current research scoring does not yet match FanDuel Test Slate #1.
+- Zero-opportunity/inactive player-games are not yet represented in baseline evaluation.
 
 ---
 
