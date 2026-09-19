@@ -219,9 +219,9 @@ Historical backtests must reproduce what was knowable before each slate locked.
 ### Current declared source lags in code
 
 - play-by-play history: 1 week
-- FTN charting history: 2 weeks
+- FTN charting history: 1 week as of the 2026-09-19 source vintage
 
-The FTN two-week assumption is currently conservative and based on limited live observation. It must be measured across the season rather than treated as permanent truth.
+The FTN lag is not a permanent constant. On 2026-09-18 FTN trailed PBP by one completed week, while on 2026-09-19 the live canary observed both sources through Week 2 before the Week 3 Sunday lock. The canary now converts the observed source gap into the required declared lag and fails on any mismatch.
 
 ### Forbidden leakage
 
@@ -509,7 +509,7 @@ No AI should silently create a separate competing architecture.
 - No ownership model is currently committed here.
 - Injury practice-status data is verified live, but final game-status/inactive sourcing and timestamped snapshot archiving are not yet implemented.
 - No frontend is currently committed here.
-- Current FTN publication lag assumption needs ongoing measurement; data-availability canaries now monitor it.
+- FTN publication lag is source-vintage dependent; the live canary currently supports a 1-week lag and will fail when the observed gap changes.
 - Current route-level information is unavailable in the free stack.
 - Direct-ridge Baseline V3 has promising player-game rolling-origin results, but the submitted FanDuel confirmation used zero yardage bonuses and must be rerun under the corrected contest rules.
 - Zero-opportunity active-roster rows are now represented; V3 currently performs worse than naive on that subset, motivating an availability hurdle-model test.
