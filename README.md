@@ -35,7 +35,9 @@ Player-level scheme sensitivity currently receives **zero DFS projection weight*
 
 In the current walk-forward test, the scheme sensitivity feature performed worse than the baseline out of sample. Team tendencies can still be used descriptively, but they do not currently alter DFS projections.
 
-Baseline V3 now implements the direct-ridge idea at player-game grain with rolling-origin validation and zero-opportunity active-roster rows. The first confirmatory run was encouraging, but it is still not production-ready because that run used zero FanDuel yardage bonuses. The actual Test Slate #1 rules show +3 bonuses at 300 passing, 100 rushing, and 100 receiving yards, so the metrics must be rerun under the corrected scoring target.
+Baseline V3 now implements the direct-ridge idea at player-game grain with rolling-origin validation, zero-opportunity active-roster rows, corrected FanDuel yardage bonuses, calibration diagnostics, and weekly-stat scoring targets. Under corrected scoring it still beats naive persistence on RMSE, but only marginally, and it loses slightly on rank correlation and MAE.
+
+The 2018-2023 block is no longer a pristine confirmatory holdout because the 2022 Taysom Hill failure directly motivated the current winsorization guard. V3 therefore remains the preferred research baseline, not yet a confirmed production model.
 
 See [PROJECT_SPEC.md](PROJECT_SPEC.md) for the current source of truth.
 
@@ -161,7 +163,7 @@ The project does not claim access to paid fields such as:
 
 The football engine now has configurable scoring. Test Slate #1 is a FanDuel 0.5 PPR, $60,000 salary-cap contest with +3 bonuses at 300 passing, 100 rushing, and 100 receiving yards.
 
-The current FanDuel profile is verified for those recorded values, but is still marked incomplete because rare player KR/PR return TDs and own-fumble-recovery TDs are not yet included in the historical skill-player target builder, and DEF is a separate model path.
+The FanDuel rule values are verified. The historical target remains marked incomplete because nflverse `special_teams_tds` is broader than only kickoff/punt return TDs and `fumble_recovery_tds` cannot isolate own recoveries. Those events are rare, but the distinction stays visible rather than being silently treated as exact. DEF is a separate model path.
 
 ## Not yet in this repository
 
@@ -169,8 +171,8 @@ The previously referenced `dfs_week2.py` optimizer/simulator file is not current
 
 Future major components still to build include:
 
-- final V3 rerun under complete FanDuel scoring
-- availability hurdle-model test
+- fresh untouched historical validation of frozen V3
+- availability hurdle-model test after V3 confirmation
 - FanDuel DEF projection path
 - DraftKings salary/player-ID ingest
 - verified final live injury/status ingest
