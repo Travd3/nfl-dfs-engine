@@ -3,9 +3,10 @@ Stage 2: as-of-lock-time features.
 
 Two publication lags, kept separate on purpose:
 
-  PBP_LAG   = 1 week.  Play-by-play for week w-1 is posted before week w locks.
-  CHART_LAG = 2 weeks. FTN charting runs a week behind pbp. Verified live:
-              on 2026-09-18 pbp held weeks 1-2 and FTN held week 1 only.
+  PBP_LAG   = 1 week. Play-by-play for week w-1 is posted before week w locks.
+  CHART_LAG = 1 week as of 2026-09-19. The live canary observed PBP and FTN
+              both through week 2 before the week 3 Sunday lock. This value is
+              source-vintage dependent and must keep being checked.
 
 Every feature is stamped with the week it becomes usable and joined backward.
 Nothing in this module can see the row it is predicting.
@@ -18,7 +19,7 @@ import polars as pl
 import numpy as np
 
 PBP_LAG = 1
-CHART_LAG = 2
+CHART_LAG = 1
 HALF_LIFE = 8          # games, for recency weighting
 TINDEX = pl.col("season") * 100 + pl.col("week")
 
