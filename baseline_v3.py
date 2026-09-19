@@ -1,21 +1,26 @@
-""" 
+"""
 Baseline V3, committed and reproducible.
 
 Single direct ridge on player-game fantasy points. No product of role and
-efficiency, no scheme, no charting. Scoring comes from a configurable profile,
-so the same code trains a DraftKings model or a FanDuel model.
+efficiency, no scheme, no charting. Scoring comes from a configurable profile.
 
 Validation is rolling origin: for each test season, train on every prior
-season only. Model selection in the V2 pass used 2024 and 2025, so those two
-seasons cannot confirm anything. Seasons 2018 through 2023 are the
-confirmatory sample and are reported separately from them.
+season only.
 
-Availability is modelled explicitly. `played_rate` is the exponentially
-weighted share of recent games in which the player recorded an opportunity.
-Without it a direct model has no way to express "this is the backup".
+IMPORTANT VALIDATION NOTE:
+The current 2018-2023 block is no longer a pristine confirmatory holdout.
+During this research pass, the 2022 TE results exposed a Taysom Hill
+extrapolation failure and motivated the training-support winsorization below.
+That fix is sensible, but once a test season changes the estimator it becomes
+development evidence. A new untouched historical block is required before V3
+can be called confirmed.
+
+Availability is represented with `played_rate`, the exponentially weighted
+share of recent games in which the player recorded an opportunity.
 """
 import numpy as np, polars as pl
 import nflreadpy as nfl
+from scipy import stats as sps
 from sklearn.linear_model import RidgeCV
 from sklearn.preprocessing import StandardScaler
 import scoring
@@ -90,7 +95,16 @@ def build_frame(profile_name):
 
 
 def prep(X, ref=None):
-    """Median-impute and clip test features to the training support."""
+    """
+    Column-wise median imputation plus clipping to the TRAINING feature range.
+
+    This guard was added after a 2022 TE evaluation exposed a pathological
+    extrapolation: Taysom Hill's QB-like pass/carry profile sat far outside the
+    historical TE support and a linear model projected an absurd score.
+
+    Because that observation changed the estimator, 2018-2023 is development
+    evidence rather than an untouched final holdout.
+    """
     X = np.asarray(X, float)
     if ref is None:
         med = np.nanmedian(X, axis=0)
@@ -126,9 +140,9 @@ def run(profile_name="fanduel_test_slate_1", min_hist=3):
             sc = StandardScaler().fit(A)
             m = RidgeCV(alphas=ALPHAS).fit(sc.transform(A), a["fpts"].to_numpy().astype(float))
             ymax = float(a["fpts"].max())
-            p = np.clip(m.predict(sc.transform(B)), 0.0, ymax)
+            pred = np.clip(m.predict(sc.transform(B)), 0.0, ymax)
             idx = (te["position"] == pos).to_numpy().nonzero()[0]
-            preds[idx] = p
+            preds[idx] = pred
         out.append(te.select(["season", "week", "pid", "position", "team", "opps"])
                      .with_columns([
                          pl.Series("y", te["fpts"].cast(float)),
@@ -156,6 +170,23 @@ def block_boot(R, metric, B=1500, seed=41):
 
 RMSE = lambda d, c: float((((d["y"] - d[c]) ** 2).mean()) ** 0.5)
 MAE = lambda d, c: float((d["y"] - d[c]).abs().mean())
+BIAS = lambda d, c: float((d[c] - d["y"]).mean())
+
+
+def spearman(d, c):
+    return float(sps.spearmanr(d["y"].to_numpy(), d[c].to_numpy()).statistic)
+
+
+def calib(d, c, bins=10):
+    """Regress actual on predicted across predicted deciles."""
+    q = d.drop_nulls(["y", c]).with_columns(
+        pl.col(c).qcut(bins, labels=[str(i) for i in range(bins)],
+                       allow_duplicates=True).alias("b"))
+    t = q.group_by("b").agg([pl.col(c).mean().alias("p"),
+                             pl.col("y").mean().alias("a"),
+                             pl.len().alias("n")]).sort("p")
+    r = sps.linregress(t["p"].to_numpy(), t["a"].to_numpy())
+    return t, r.slope, r.intercept, r.rvalue
 
 
 def report(R, profile_name):
@@ -163,11 +194,11 @@ def report(R, profile_name):
     print("=" * 74)
     print(f"BASELINE V3, rolling origin, scoring profile {prof.name} "
           f"(verified={prof.verified}, complete={prof.complete})")
-    print(f"player-game grain, zero-opportunity rows included, n={len(R)}")
+    print(f"player-game grain, zero-opportunity active-roster rows included, n={len(R)}")
     print("=" * 74)
 
-    for lab, sub in [("ALL test seasons", R),
-                     ("CONFIRMATORY 2018-2023", R.filter(pl.col("season") <= 2023)),
+    for lab, sub in [("ALL 2018-2025 DEVELOPMENT EVIDENCE", R),
+                     ("2018-2023 DEVELOPMENT BLOCK", R.filter(pl.col("season") <= 2023)),
                      ("reused 2024-2025", R.filter(pl.col("season") >= 2024))]:
         if not len(sub):
             continue
@@ -178,6 +209,11 @@ def report(R, profile_name):
               f"delta {mu:+.4f}  CI [{lo:+.4f}, {hi:+.4f}]  P>0={p:.3f}")
         print(f"  MAE  naive {MAE(sub,'naive'):.4f}  v3 {MAE(sub,'v3'):.4f}  "
               f"delta {mm:+.4f}  CI [{ml:+.4f}, {mh:+.4f}]  P>0={mp:.3f}")
+        print(f"  Spearman  naive {spearman(sub,'naive'):.4f}  v3 {spearman(sub,'v3'):.4f}")
+        print(f"  bias      naive {BIAS(sub,'naive'):+.4f}  v3 {BIAS(sub,'v3'):+.4f}")
+        for c in ("naive", "v3"):
+            _, sl, ic, rv = calib(sub, c)
+            print(f"  calib {c:5s} slope {sl:6.3f}  intercept {ic:+6.3f}  r {rv:.4f}")
 
     print("\nby season (RMSE)")
     print(f"  {'season':7s}{'n':>7s}{'naive':>9s}{'v3':>9s}{'delta':>9s}")
@@ -193,11 +229,19 @@ def report(R, profile_name):
             print(f"  {pos:4s} n={len(d):6d}  naive {RMSE(d,'naive'):7.4f}  "
                   f"v3 {RMSE(d,'v3'):7.4f}  delta {RMSE(d,'naive')-RMSE(d,'v3'):+.4f}")
 
-    print("\nzero-opportunity rows vs played rows (RMSE)")
+    print("\nzero-opportunity rows vs played rows")
     for lab, d in [("played", R.filter(pl.col("opps") > 0)),
                    ("zero opps", R.filter(pl.col("opps") == 0))]:
-        print(f"  {lab:10s} n={len(d):6d}  naive {RMSE(d,'naive'):7.4f}  "
-              f"v3 {RMSE(d,'v3'):7.4f}  delta {RMSE(d,'naive')-RMSE(d,'v3'):+.4f}")
+        print(f"  {lab:10s} n={len(d):6d}  RMSE naive {RMSE(d,'naive'):7.4f} "
+              f"v3 {RMSE(d,'v3'):7.4f} delta {RMSE(d,'naive')-RMSE(d,'v3'):+.4f}   "
+              f"MAE naive {MAE(d,'naive'):6.4f} v3 {MAE(d,'v3'):6.4f}   "
+              f"bias v3 {BIAS(d,'v3'):+.3f}")
+
+    print("\ncalibration deciles, v3, 2018-2023 development block")
+    t, sl, ic, rv = calib(R.filter(pl.col("season") <= 2023), "v3")
+    print(f"  {'pred':>7s} {'actual':>7s} {'n':>7s}")
+    for row in t.iter_rows(named=True):
+        print(f"  {row['p']:7.2f} {row['a']:7.2f} {row['n']:7d}")
 
 
 if __name__ == "__main__":
