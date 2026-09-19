@@ -15,6 +15,7 @@ Run:  pytest tests/test_data_availability.py -v
 import pytest
 import polars as pl
 import nflreadpy as nfl
+from features import CHART_LAG
 
 SEASON = nfl.get_current_season()
 PRIOR = SEASON - 1
@@ -80,20 +81,24 @@ def test_participation_available_historically():
 
 
 # --------------------------------------------------------------- charting lag
-def test_ftn_charting_lags_play_by_play():
+def test_ftn_charting_lag_matches_live_freshness():
     """
-    The engine declares CHART_LAG = 2 against PBP_LAG = 1. That rests on FTN
-    trailing play-by-play. Measured here rather than assumed.
+    Convert the observed live source gap into the lag the feature builder
+    should declare for the next slate.
 
-    If FTN ever catches up, CHART_LAG can be reduced to 1 and every scheme
-    feature becomes a week fresher.
+    If PBP and FTN are both through week w before week w+1 locks, chart data
+    can use lag=1. If FTN trails PBP by one completed week, lag=2 is required.
+    Any mismatch fails so the source-vintage assumption gets reviewed.
     """
     pbp_wk = nfl.load_pbp([SEASON])["week"].max()
     ftn_wk = nfl.load_ftn_charting([SEASON])["week"].max()
-    print(f"\n  pbp through week {pbp_wk}, ftn through week {ftn_wk}")
+    print(f"\n  pbp through week {pbp_wk}, ftn through week {ftn_wk}, declared lag {CHART_LAG}")
     assert ftn_wk <= pbp_wk, "charting ahead of play-by-play, which should be impossible"
-    if ftn_wk == pbp_wk:
-        pytest.fail("FTN has caught up to pbp; CHART_LAG=2 is now too conservative")
+    observed_required_lag = int(pbp_wk - ftn_wk) + 1
+    assert CHART_LAG == observed_required_lag, (
+        f"live source gap implies CHART_LAG={observed_required_lag}, "
+        f"but features.py declares {CHART_LAG}"
+    )
 
 
 def test_ftn_condition_fields_present():
