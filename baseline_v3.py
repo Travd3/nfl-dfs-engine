@@ -7,13 +7,12 @@ efficiency, no scheme, no charting. Scoring comes from a configurable profile.
 Validation is rolling origin: for each test season, train on every prior
 season only.
 
-IMPORTANT VALIDATION NOTE:
-The current 2018-2023 block is no longer a pristine confirmatory holdout.
-During this research pass, the 2022 TE results exposed a Taysom Hill
-extrapolation failure and motivated the training-support winsorization below.
-That fix is sensible, but once a test season changes the estimator it becomes
-development evidence. A new untouched historical block is required before V3
-can be called confirmed.
+VALIDATION NOTE:
+The 2018-2023 block became development evidence after the 2022 Taysom Hill
+extrapolation failure motivated the training-support winsorization below.
+After freezing the estimator, the historical window was extended backward.
+The fresh untouched confirmation block is 2011-2017; 2010 is requested by
+FIRST_TEST but is skipped by the frozen minimum-training-row guard.
 
 Availability is represented with `played_rate`, the exponentially weighted
 share of recent games in which the player recorded an opportunity.
@@ -28,7 +27,9 @@ import scoring
 HALF_LIFE = 8
 PBP_LAG = 1
 ALPHAS = np.logspace(-2, 4, 25)
-FIRST_TEST = 2018
+FIRST_TEST = 2010
+CONFIRM_START = 2011
+CONFIRM_END = 2017
 
 FEATURES = [
     "fpts__ewm", "opps__ewm", "targets__ewm", "carries__ewm", "pass_att__ewm",
@@ -197,8 +198,11 @@ def report(R, profile_name):
     print(f"player-game grain, zero-opportunity active-roster rows included, n={len(R)}")
     print("=" * 74)
 
-    for lab, sub in [("ALL 2018-2025 DEVELOPMENT EVIDENCE", R),
-                     ("2018-2023 DEVELOPMENT BLOCK", R.filter(pl.col("season") <= 2023)),
+    for lab, sub in [("ALL AVAILABLE TEST SEASONS", R),
+                     ("FRESH CONFIRMATION 2011-2017",
+                      R.filter(pl.col("season").is_between(CONFIRM_START, CONFIRM_END))),
+                     ("2018-2023 DEVELOPMENT BLOCK",
+                      R.filter(pl.col("season").is_between(2018, 2023))),
                      ("reused 2024-2025", R.filter(pl.col("season") >= 2024))]:
         if not len(sub):
             continue
@@ -237,8 +241,9 @@ def report(R, profile_name):
               f"MAE naive {MAE(d,'naive'):6.4f} v3 {MAE(d,'v3'):6.4f}   "
               f"bias v3 {BIAS(d,'v3'):+.3f}")
 
-    print("\ncalibration deciles, v3, 2018-2023 development block")
-    t, sl, ic, rv = calib(R.filter(pl.col("season") <= 2023), "v3")
+    print("\ncalibration deciles, v3, fresh confirmation 2011-2017")
+    t, sl, ic, rv = calib(
+        R.filter(pl.col("season").is_between(CONFIRM_START, CONFIRM_END)), "v3")
     print(f"  {'pred':>7s} {'actual':>7s} {'n':>7s}")
     for row in t.iter_rows(named=True):
         print(f"  {row['p']:7.2f} {row['a']:7.2f} {row['n']:7d}")
