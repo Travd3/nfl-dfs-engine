@@ -291,76 +291,130 @@ The main structural conclusion is still useful: independently fitting opportunit
 
 The exact results must remain reproducible from committed code and should be confirmed on a broader rolling historical sample.
 
-### Baseline V3 corrected-scoring development pass
+### Baseline V3 fresh historical confirmation
 
-The player-game builder now uses nflverse weekly player stats for common box-score categories, applies the actual FanDuel +3 yardage bonuses, includes two-point conversions, and carries proxies for the rare return/fumble-recovery TD categories.
+The frozen V3 estimator was extended backward without changing the feature set,
+winsorization thresholds, scoring logic, alpha grid, or evaluation metrics.
 
-Claude reported:
+A schema audit found that `targets` is effectively unusable in 2003-2008 even
+though receptions remain populated. Because `targets__ewm`, `opps`,
+`played_rate__ewm`, and `play_share__ewm` depend on target attribution, the
+training floor is 2009. The requested 2010 test season was then skipped by the
+already-frozen minimum-training-row guard, leaving 2011-2017 as the untouched
+confirmation block.
+
+Reported fresh confirmation:
 
 ```text
-FanDuel Test Slate #1 scoring, player-game grain, n=59,773
+FanDuel Test Slate #1 scoring, player-game grain
+Fresh confirmation 2011-2017, n=44,857
 
-2018-2023 development block
-  RMSE  naive 5.9541   v3 5.9251   delta +0.0288
-  95% CI [+0.0008, +0.0623]
-  MAE   naive 3.9132   v3 3.9365
-  Spearman     0.6438      0.6413
-  bias        +0.0741     -0.1098
-  calibration slope/intercept:
-      naive 0.922 / +0.352
-      v3    1.043 / -0.115
+RMSE
+  naive 5.6916
+  V3    5.6566
+  delta +0.0348
+  95% CI [+0.0102, +0.0606]
+  P>0 = 0.999
 
-2024-2025 reused/model-selection seasons
-  RMSE  naive 5.7843   v3 5.7409   delta +0.0442
-  95% CI [+0.0059, +0.0888]
+MAE
+  naive 3.5670
+  V3    3.6004
+  delta -0.0335
+  95% CI [-0.0478, -0.0183]
 
-ALL 2018-2025
-  RMSE  naive 5.9120   v3 5.8794   delta +0.0330
-  95% CI [+0.0086, +0.0598]
+Spearman
+  naive 0.6533
+  V3    0.6505
+
+Bias
+  naive +0.0343
+  V3    -0.1246
+
+Calibration
+  naive slope 0.913 / intercept +0.385
+  V3    slope 1.029 / intercept -0.010
+```
+
+By season, V3 lost 2011 and 2012 and improved in each season from 2013 through
+2017. By position, the aggregate direction was positive for QB, RB, WR, and TE,
+but only RB's position-specific bootstrap interval excluded zero.
+
+Most importantly, the aggregate RMSE advantage is not uniform across player
+states:
+
+```text
+played rows
+  n=25,361
+  RMSE delta -0.0570
+  V3 bias -1.840
+
+zero-opportunity rows
+  n=19,496
+  RMSE delta +0.2567
+  V3 bias +2.106
 ```
 
 Interpretation:
-- V3 still improves RMSE under the corrected FanDuel scoring target, but the margin is small.
-- MAE and rank correlation favor naive persistence in the 2018-2023 block.
+- V3 has now cleared the project's broad mean-projection RMSE gate on an untouched historical block.
 - V3 calibration is materially better than naive persistence.
-- V3 improves zero-opportunity rows but is worse on played rows under the corrected target.
-- The previous pre-bonus FanDuel metrics are void.
+- V3 remains slightly worse on MAE and rank correlation.
+- The total RMSE gain is driven by better handling of zero-opportunity rows.
+- V3 is reliably worse than naive persistence on rows where the player records an opportunity.
 
-**2018-2023 is not a pristine confirmatory holdout anymore.** During this pass, the 2022 TE results exposed an extreme Taysom Hill extrapolation error and directly motivated the 0.5/99.5 training-support winsorization now used by V3. Once a test season changes the estimator, it becomes development evidence.
+Therefore V3 is promoted to **INTERIM PRODUCTION MEAN BASELINE**, not to a final
+DFS ranking or tournament model. Its weaknesses on played-player production and
+ordering are explicit requirements for the next modeling pass.
 
-Therefore V3 remains **PREFERRED RESEARCH BASELINE / NOT YET CONFIRMED FOR PRODUCTION**.
-
-A new untouched historical block is required before promotion. nflverse player stats and PBP are available back to 1999, while weekly rosters are available back to 2002, so V3 can be frozen and evaluated on an earlier rolling-origin block without using FTN charting.
+The historical FanDuel scoring rules are verified, but the target remains
+`complete=False` because `special_teams_tds` is broader than only kickoff/punt
+return touchdowns and `fumble_recovery_tds` cannot isolate own recoveries.
+Those rare semantic gaps are documented rather than hidden.
 ---
 
 ## 8. Baseline model status
 
 ### Baseline V1
-Role and efficiency were modeled separately, then multiplied. Held-out testing indicated that independently estimating the two components compounded variance.
+Role and efficiency were modeled separately, then multiplied. Held-out testing
+showed that independently estimating the two components compounded variance.
 
 ### Baseline V2
-A single direct ridge on fantasy points was better than the role × efficiency product. Added snap share, red-zone role, pace, rest, and venue did not improve it and remain **REJECTED** for projection weight.
+A direct ridge on fantasy points outperformed the role × efficiency product.
+Added snap share, red-zone role, pace, rest, and venue did not improve it and
+remain **REJECTED** for projection weight.
 
 ### Baseline V3
-`baseline_v3.py` implements the direct player-game ridge with:
-- rolling-origin evaluation
-- player-game targets
-- zero-opportunity active-roster rows
-- configurable platform scoring
-- calibration and rank diagnostics
-- clipping to training feature support for extreme role/position mismatches
+`baseline_v3.py` is now the **INTERIM PRODUCTION MEAN BASELINE**.
 
-Current status: **PREFERRED RESEARCH BASELINE / NOT YET CONFIRMED FOR PRODUCTION.**
+Why it earned that status:
+- final player-game grain
+- platform-configurable scoring
+- zero-opportunity active-roster rows included
+- rolling-origin validation
+- fresh untouched 2011-2017 confirmation
+- block-bootstrap RMSE improvement vs naive persistence
+- materially improved calibration
 
-The corrected FanDuel run still favors V3 on RMSE and calibration, but not on MAE or rank correlation. More importantly, 2022 influenced the estimator through the Taysom Hill clipping fix, so the 2018-2023 block can no longer be called untouched confirmation.
+Why it is still only interim:
+- MAE remains worse than naive persistence
+- Spearman rank correlation remains slightly worse
+- its RMSE edge is driven by zero-opportunity rows
+- it is worse than naive persistence on played-player rows
+- it is not an outcome-distribution, ceiling, or contest-win model
 
-### Next validation step
-Freeze V3 as currently implemented and extend the historical source window. Use an earlier untouched rolling-origin block, preferably 2010-2017 with prior seasons reserved only for training, if all required fields are available and semantically consistent.
+### Next modeling question
+Issue #2 is now unblocked: test an availability hurdle model and/or conditional
+production model without sacrificing the validated availability advantage.
 
-Do not change V3 after seeing that fresh block and still call the same block confirmatory. Any estimator change triggered by those results resets the validation process.
+Candidate structure:
 
-### Availability hurdle model
-Issue #2 remains a justified experiment, but is blocked until the fresh V3 confirmation is complete. The corrected target flipped the played/zero-row direction from the earlier pass, so the hurdle model should be tested rather than assumed superior.
+```text
+P(records opportunity / plays)
+    ×
+E[points | plays]
+```
+
+The candidate must beat frozen V3 on held-out data and must report played,
+zero-opportunity, and DFS-relevant ranking slices separately.
 
 ---
 
@@ -388,12 +442,12 @@ RMSE is only an interim metric for point projections. It is not the final tourna
 ## 10. DFS roadmap
 
 ### Immediate
-1. Freeze current V3 and run a genuinely fresh historical confirmation block using earlier seasons.
-2. Keep FanDuel scoring rules verified but historical target completeness false until rare return/fumble-recovery semantics are exact or explicitly accepted as approximations.
-3. Keep Issue #2 hurdle-model work blocked until V3's fresh confirmation is known.
-4. Use the official FanDuel upload template already ingested for Test Slate #1.
-5. Complete reliable final game-status/inactive sourcing.
-6. Add a separate FanDuel DEF scoring/projection path before a complete 9-player lineup can be generated.
+1. Build live V3 inference for the official FanDuel Test Slate #1 player pool.
+2. Add a FanDuel DEF mean projection/scoring path.
+3. Test Issue #2 availability/conditional-production improvements against frozen V3.
+4. Build the first salary-cap optimizer for the 9-player, $60,000 FanDuel roster.
+5. Build a minimal test interface that shows projections, salary, value, and the recommended lineup.
+6. Complete reliable final game-status/inactive sourcing before Sunday lock.
 
 ### After baseline improvement
 4. Add defensive contextual features only if they pass held-out tests.
@@ -527,8 +581,8 @@ No AI should silently create a separate competing architecture.
 - No frontend is currently committed here.
 - FTN publication lag is source-vintage dependent; the live canary currently supports a 1-week lag and will fail when the observed gap changes.
 - Current route-level information is unavailable in the free stack.
-- Direct-ridge Baseline V3 still improves RMSE under corrected FanDuel scoring, but 2018-2023 is development evidence rather than a pristine confirmatory holdout because the 2022 Taysom Hill error changed the estimator.
-- V3 currently improves zero-opportunity rows but loses RMSE on played rows under corrected scoring; the direction is target-sensitive, so hurdle modeling remains experimental.
+- Direct-ridge Baseline V3 has passed a fresh 2011-2017 RMSE confirmation and is the interim production mean baseline.
+- V3's gain is concentrated in zero-opportunity rows; it remains worse than naive on played rows and slightly worse on rank correlation, so conditional production/ranking still needs improvement.
 - FanDuel rule values are verified, but historical target completeness remains false because `special_teams_tds` is broader than kickoff/punt return TDs and `fumble_recovery_tds` cannot isolate own recoveries.
 - FanDuel DEF scoring/projection is not yet implemented.
 - The official FanDuel Test Slate #1 player pool is available through the upload-template ingest path.
