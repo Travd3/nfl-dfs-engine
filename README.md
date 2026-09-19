@@ -35,7 +35,7 @@ Player-level scheme sensitivity currently receives **zero DFS projection weight*
 
 In the current walk-forward test, the scheme sensitivity feature performed worse than the baseline out of sample. Team tendencies can still be used descriptively, but they do not currently alter DFS projections.
 
-The larger unresolved issue is the baseline itself. Baseline V1 is effectively tied with naive scoring persistence, so projection quality needs to improve before more advanced contest modeling can be trusted.
+Baseline V2 research found a promising structural improvement: a direct ridge model on fantasy points outperformed the old role × efficiency product on held-out RMSE. The gain is small and is not yet considered production-ready because scoring is not yet platform-configurable, evaluation is still channel-level, zero-opportunity games are excluded, and the model-selection result needs confirmatory testing.
 
 See [PROJECT_SPEC.md](PROJECT_SPEC.md) for the current source of truth.
 
@@ -61,6 +61,15 @@ See [PROJECT_SPEC.md](PROJECT_SPEC.md) for the current source of truth.
 
 - `diagnostics.py`  
   Tests team tendency persistence, player sensitivity persistence, and player team-change effects.
+
+- `features_v2.py`  
+  Experimental role features tested in the second baseline pass. These features are currently rejected for projection weight.
+
+- `baseline_v2.py`  
+  Compares the original baseline, opportunity-weighted variants, direct ridge, and gradient-boosted alternatives.
+
+- `metric_choice.py`  
+  Compares RMSE, MAE, and bias behavior across Baseline V2 arms.
 
 ## Setup
 
@@ -135,6 +144,10 @@ The project does not claim access to paid fields such as:
 4. Production, experimental, descriptive, and unsupported features must remain clearly separated.
 5. Free-data limitations must be visible rather than hidden.
 6. DFS comes first. Dynasty and weekly redraft are future products built from the same data layer.
+
+## Current platform note
+
+The football engine is being moved toward configurable scoring. The current historical research targets were built under the original full-PPR implementation, while Test Slate #1 is a FanDuel-style 0.5 PPR, $60,000 salary-cap contest. Historical scoring must be rebuilt from explicit platform rules before the test-slate projection is considered valid.
 
 ## Not yet in this repository
 
