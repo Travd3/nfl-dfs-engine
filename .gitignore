@@ -33,3 +33,7 @@ Thumbs.db
 
 # Runtime source-vintage snapshot
 data_vintage.json
+
+# User-specific FanDuel upload templates / contest exports
+FanDuel-*-entries-upload-template.csv
+*entries-upload-template.csv
