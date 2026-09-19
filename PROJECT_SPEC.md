@@ -80,17 +80,19 @@ These claims are guarded by `tests/test_data_availability.py`.
 
 Sleeper may be useful as a same-day overlay, but its public API documentation says free use is for non-commercial purposes and commercial use requires contacting Sleeper. Do not make Sleeper a commercial product dependency without permission.
 
-#### DraftKings salaries and IDs
-**Status: PRODUCTION INPUT.**
+#### Platform salaries and IDs
+**Status: PRODUCTION INPUT WHEN FROM THE OFFICIAL PLATFORM EXPORT.**
 
-Use the official DraftKings lobby/lineup-template CSV supplied to the logged-in user. It is the source of truth for:
-- slate membership
-- salary
-- roster position
-- DraftKings player ID
-- team/game metadata
+DraftKings:
+- use the official lobby/lineup-template CSV supplied to the logged-in user
+- do not make the undocumented draftables API a production dependency
 
-Do not make the undocumented DraftKings draftables API a production dependency.
+FanDuel:
+- use the official entries upload-template CSV for the target slate
+- `ingest_fanduel.py` extracts the player pool while dropping user-specific entry/contest identifiers
+- raw upload templates remain gitignored
+
+The official platform file is the source of truth for slate membership, salary, roster position, platform player ID, and team/game metadata.
 
 #### Weather
 **Status: EXPERIMENTAL FOR MODEL WEIGHT; LIVE NWS FEED APPROVED FOR CURRENT-SLATE DISPLAY.**
@@ -289,35 +291,60 @@ The main structural conclusion is still useful: independently fitting opportunit
 
 The exact results must remain reproducible from committed code and should be confirmed on a broader rolling historical sample.
 
+### Baseline V3 provisional confirmatory pass
+
+A later rolling-origin pass moved evaluation to final player-game grain, included zero-opportunity active-roster rows, corrected team-play counting, and tested 2018-2025. Claude reported:
+
+```text
+FanDuel provisional scoring, player-game grain, n=59,773
+
+                         naive     v3      delta        95% CI
+ALL 2018-2025    RMSE   5.3935  5.3692   +0.0241  [+0.0137,+0.0343]
+CONFIRM 2018-23  RMSE   5.4258  5.4053   +0.0207  [+0.0093,+0.0322]
+reused 2024-25   RMSE   5.2960  5.2602   +0.0359  [+0.0172,+0.0549]
+```
+
+The structural result is encouraging, but those FanDuel numbers are **not canonical yet**. The run used zero yardage bonuses because the bonuses were treated as unresolved. The actual Test Slate #1 contest screenshots explicitly show:
+- +3 at 300 passing yards
+- +3 at 100 rushing yards
+- +3 at 100 receiving yards
+
+The integrated FanDuel scoring profile has been corrected to those values. Passing two-point conversions were also missing from the submitted player-game builder and have been corrected so both the passer and the scoring player receive +2 on a successful passing conversion.
+
+The current historical builder still omits rare player KR/PR return TDs and own-fumble-recovery TDs, both of which the actual contest awards +6. DEF scoring is also separate. Therefore the FanDuel profile is verified for its recorded values but remains `complete=False`, and V3 must be rerun before promotion.
+
+A second important finding from the provisional run:
+- V3 improved RMSE on played rows
+- V3 was worse than naive on zero-opportunity rows
+- QB was the only position where V3 did not beat naive, and QB also had a very high zero-row share
+
+This makes a hurdle/availability model a justified next experiment only after the corrected V3 rerun.
+
 ---
 
 ## 8. Baseline model status
 
 ### Baseline V1
-Role and efficiency were modeled separately, then multiplied.
+Role and efficiency were modeled separately, then multiplied. Held-out testing indicates that independently estimating the two components compounds variance.
 
-That structure is interpretable, but held-out testing indicates that independently estimating the two components compounds variance.
+### Baseline V2
+A single direct ridge on fantasy points was better than the role × efficiency product. Added snap share, red-zone role, pace, rest, and venue did not improve it and remain **REJECTED** for projection weight.
 
-### Baseline V2 finding
-The best current research direction is a **single direct ridge model on fantasy points using the original baseline features**.
+### Baseline V3
+`baseline_v3.py` now implements the direct player-game ridge with rolling-origin validation, player-game targets, zero-opportunity rows, and training-support clipping for extreme role/position mismatches such as Taysom Hill.
 
-Extra V2 features tested:
-- snap share
-- red-zone opportunity/share
-- team pace proxy
-- rest
-- home/away
+Current status: **PREFERRED RESEARCH BASELINE / NOT YET PRODUCTION.**
 
-These extra features are currently **REJECTED** for projection weight because they did not improve the direct model in the reported held-out test.
+The submitted confirmatory run was encouraging, but it used an incorrect FanDuel bonus configuration. The actual contest rules resolve those bonuses at +3 for 300 passing, 100 rushing, and 100 receiving yards. The historical target builder also still needs rare player return-TD and own-fumble-recovery-TD categories before the FanDuel profile can be marked complete.
 
-### Current highest-priority modeling question
-Can the direct-ridge result survive a confirmatory test once:
-1. scoring is configurable and matches the target platform,
-2. predictions are evaluated at final player-game fantasy-point level,
-3. zero-opportunity / inactive outcomes are represented,
-4. a broader rolling historical sample is used?
+### Next modeling question
+After V3 is rerun under the corrected and complete scoring target, test a hurdle formulation:
 
-Until that is done, the direct ridge is the preferred research baseline but not yet a production projection.
+```text
+E[points] = P(records an opportunity / plays) × E[points | plays]
+```
+
+This is not the same rejected role × efficiency product. Availability is a genuine point-mass-at-zero mixture. It must still be tested as an arm against V3 rather than assumed superior.
 
 ---
 
@@ -345,10 +372,12 @@ RMSE is only an interim metric for point projections. It is not the final tourna
 ## 10. DFS roadmap
 
 ### Immediate
-1. Make scoring/roster rules configurable and add the FanDuel Test Slate #1 profile.
-2. Rebuild and confirm the direct-ridge baseline at player-game level under correct scoring.
-3. Add official platform salary/player-ID ingest for the target slate.
-4. Complete reliable final game-status/inactive sourcing.
+1. Complete the FanDuel skill-player scoring target, including rare KR/PR return TDs and own-fumble-recovery TDs.
+2. Rerun Baseline V3 under the corrected +3 yardage bonuses and complete player scoring.
+3. If V3 still clears naive persistence, test the availability hurdle model against V3.
+4. Use the official FanDuel upload template already ingested for Test Slate #1.
+5. Complete reliable final game-status/inactive sourcing.
+6. Add a separate DEF projection/scoring path for the FanDuel lineup.
 
 ### After baseline improvement
 4. Add defensive contextual features only if they pass held-out tests.
@@ -482,9 +511,11 @@ No AI should silently create a separate competing architecture.
 - No frontend is currently committed here.
 - Current FTN publication lag assumption needs ongoing measurement; data-availability canaries now monitor it.
 - Current route-level information is unavailable in the free stack.
-- Direct-ridge baseline is promising versus naive persistence by channel-level RMSE, but still requires confirmatory player-game and platform-correct scoring validation.
-- Current research scoring does not yet match FanDuel Test Slate #1.
-- Zero-opportunity/inactive player-games are not yet represented in baseline evaluation.
+- Direct-ridge Baseline V3 has promising player-game rolling-origin results, but the submitted FanDuel confirmation used zero yardage bonuses and must be rerun under the corrected contest rules.
+- Zero-opportunity active-roster rows are now represented; V3 currently performs worse than naive on that subset, motivating an availability hurdle-model test.
+- FanDuel player scoring still needs rare KR/PR return TD and own-fumble-recovery TD categories before the profile is complete.
+- FanDuel DEF scoring/projection is not yet implemented.
+- The official FanDuel Test Slate #1 player pool is available through the upload-template ingest path.
 
 ---
 
