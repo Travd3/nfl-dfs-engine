@@ -177,11 +177,21 @@ def norm_team(t: str) -> str:
     return TEAM_ALIASES.get(t, t)
 
 
-def nflverse_names(season: int, week: int) -> pl.DataFrame:
+def resolve_table(season: int, week: int) -> pl.DataFrame:
+    """
+    Every nflverse player on a roster this season, ANY status, with the
+    normalized keys used for matching. Resolution is deliberately separated
+    from projection eligibility: a name we can identify but cannot project is
+    a different problem from a name we cannot identify at all, and collapsing
+    the two into "unmapped" hides which one occurred.
+    """
     ros = nfl.load_rosters_weekly([season]).filter(pl.col("week") <= week)
     ros = (ros.sort("week", descending=True)
               .unique(subset=["gsis_id"], keep="first")
-              .select([pl.col("gsis_id").alias("pid"), "full_name", "position", "team"]))
+              .select([pl.col("gsis_id").alias("pid"), "full_name",
+                       pl.col("position").alias("nfl_position"),
+                       "team", "status"])
+              .drop_nulls("pid"))
     return ros.with_columns([
         pl.col("full_name").map_elements(norm_name, return_dtype=pl.Utf8).alias("nkey"),
         pl.col("team").map_elements(norm_team, return_dtype=pl.Utf8).alias("tkey"),
@@ -190,52 +200,81 @@ def nflverse_names(season: int, week: int) -> pl.DataFrame:
 
 def map_to_fanduel(proj: pl.DataFrame, pool: pl.DataFrame,
                    season: int, week: int) -> tuple[pl.DataFrame, pl.DataFrame]:
-    names = nflverse_names(season, week)
-    proj = proj.join(names.select(["pid", "full_name", "nkey", "tkey"]), on="pid", how="left")
+    res = resolve_table(season, week)
+    res_nt = res.unique(subset=["nkey", "tkey"], keep="first")
+    res_n = res.unique(subset=["nkey"], keep="first")
 
     fd = pool.filter(pl.col("Position").is_in(POSITIONS)).with_columns([
-        (pl.col("First Name") + " " + pl.col("Last Name")).alias("fd_name"),
+        pl.when(pl.col("Nickname").str.len_chars() > 0).then(pl.col("Nickname"))
+          .otherwise(pl.col("First Name") + " " + pl.col("Last Name")).alias("fd_name"),
     ])
+    # Two name keys per row. FanDuel's Nickname is the display name and can be
+    # a genuine nickname: "Hollywood Brown" where nflverse carries "Marquise
+    # Brown". First+Last recovers those.
     fd = fd.with_columns([
         pl.col("fd_name").map_elements(norm_name, return_dtype=pl.Utf8).alias("nkey"),
+        (pl.col("First Name") + " " + pl.col("Last Name"))
+            .map_elements(norm_name, return_dtype=pl.Utf8).alias("nkey2"),
         pl.col("Team").map_elements(norm_team, return_dtype=pl.Utf8).alias("tkey"),
     ])
 
-    # pass 1: name + team + position. pass 2: name + position only.
-    p1 = fd.join(proj.select(["nkey", "tkey", "position", "pid", "v3_projection"]),
-                 left_on=["nkey", "tkey", "Position"],
-                 right_on=["nkey", "tkey", "position"], how="left")
-    need = p1.filter(pl.col("pid").is_null()).drop(["pid", "v3_projection"])
-    p2 = need.join(proj.select(["nkey", "position", "pid", "v3_projection"]).unique(subset=["nkey", "position"]),
-                   left_on=["nkey", "Position"], right_on=["nkey", "position"], how="left")
+    RES = ["pid", "nfl_position", "status"]
+    passes = [
+        (res_nt.select(["nkey", "tkey"] + RES), ["nkey", "tkey"], ["nkey", "tkey"]),
+        (res_nt.select(["nkey", "tkey"] + RES).rename({"nkey": "nkey2"}),
+         ["nkey2", "tkey"], ["nkey2", "tkey"]),
+        (res_n.select(["nkey"] + RES), ["nkey"], ["nkey"]),
+        (res_n.select(["nkey"] + RES).rename({"nkey": "nkey2"}), ["nkey2"], ["nkey2"]),
+    ]
+    resolved, pending = None, fd
+    for src, left_on, right_on in passes:
+        if pending is None or len(pending) == 0:
+            break
+        j = pending.join(src, left_on=left_on, right_on=right_on, how="left")
+        got = j.filter(pl.col("pid").is_not_null())
+        resolved = got if resolved is None else pl.concat([resolved, got], how="diagonal_relaxed")
+        pending = j.filter(pl.col("pid").is_null()).drop(RES)
+    if pending is not None and len(pending):
+        pending = pending.with_columns([pl.lit(None, dtype=pl.Utf8).alias(c) for c in RES])
+        resolved = pl.concat([resolved, pending], how="diagonal_relaxed")
+    fd = resolved
 
-    merged = pl.concat([p1.filter(pl.col("pid").is_not_null()),
-                        p2], how="diagonal_relaxed")
-    merged = merged.with_columns([
-        pl.when(pl.col("pid").is_null()).then(pl.lit("unmapped"))
-          .when(pl.col("v3_projection").is_null()).then(pl.lit("mapped_no_projection"))
-          .otherwise(pl.lit("ok")).alias("mapping_status"),
+    fd = fd.join(proj.select(["pid", "v3_projection"]), on="pid", how="left")
+
+    fd = fd.with_columns([
+        pl.when(pl.col("pid").is_null())
+          .then(pl.lit("unresolved"))
+          .when(pl.col("v3_projection").is_not_null())
+          .then(pl.lit("ok"))
+          .when(~pl.col("nfl_position").is_in(POSITIONS))
+          .then(pl.lit("position_mismatch"))
+          .when(pl.col("status") != "ACT")
+          .then(pl.lit("inactive_or_practice_squad"))
+          .otherwise(pl.lit("no_history"))
+          .alias("mapping_status"),
     ]).with_columns([
         (pl.col("v3_projection") / (pl.col("Salary") / 1000.0)).alias("pts_per_1k"),
     ])
 
-    table = merged.select([
+    table = fd.select([
         pl.col("Id").alias("fanduel_id"),
         pl.col("fd_name").alias("player"),
         pl.col("Position").alias("position"),
         pl.col("Salary").alias("salary"),
         pl.col("Team").alias("team"),
         pl.col("Opponent").alias("opponent"),
+        pl.col("Game").alias("game"),
         pl.col("Roster Position").alias("roster_position"),
         pl.col("v3_projection").round(2),
         pl.col("pts_per_1k").round(3),
         pl.col("Injury Indicator").alias("injury_indicator"),
         pl.col("Injury Details").alias("injury_details"),
         pl.col("pid").alias("gsis_id"),
+        pl.col("nfl_position").alias("nflverse_position"),
+        pl.col("status").alias("nflverse_status"),
         "mapping_status",
     ]).sort(["position", "v3_projection"], descending=[False, True], nulls_last=True)
 
-    # slate players the model could not reach, and model rows no FanDuel row claimed
     unmapped = table.filter(pl.col("mapping_status") != "ok")
     return table, unmapped
 
@@ -288,8 +327,12 @@ def main():
     ok = table.filter(pl.col("mapping_status") == "ok")
     print(f"\nslate skill players: {len(table)}   mapped+projected: {len(ok)} "
           f"({len(ok)/max(len(table),1):.1%})")
-    print(table.group_by(["position", "mapping_status"]).len()
-               .sort(["position", "mapping_status"]))
+    print("\nmapping status totals:")
+    print(table.group_by("mapping_status").len().sort("len", descending=True))
+    print("\nby position:")
+    print(table.pivot(values="fanduel_id", index="position",
+                      on="mapping_status", aggregate_function="len").fill_null(0))
+    print("\ngames represented:", table["game"].n_unique())
     if len(unmapped):
         print(f"\nUNMAPPED / UNPROJECTED ({len(unmapped)}):")
         print(unmapped.select(["player", "position", "team", "salary",
