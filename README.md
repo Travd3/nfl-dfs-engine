@@ -181,7 +181,7 @@ Future major components still to build include:
 
 - live V3 inference for the 2026 FanDuel slate
 - non-multiplicative conditional-production research after the first live test
-- FanDuel DEF projection path
+- FanDuel optimizer + minimal test interface
 - DraftKings salary/player-ID ingest
 - verified final live injury/status ingest
 - game simulation
@@ -189,3 +189,18 @@ Future major components still to build include:
 - ownership model
 - GPP portfolio optimizer
 - frontend / research desk
+
+
+### FanDuel DEF baseline
+
+The first transparent FanDuel DEF mean model is now accepted for Test Slate #1.
+
+Corrected rolling-origin result:
+- RMSE 5.5008 vs 5.7547 naive
+- RMSE improvement +0.2540
+- 95% CI [+0.2136, +0.2939]
+- positive RMSE direction in all 14 reported test seasons
+- Spearman 0.3127 vs 0.1388 naive
+- calibration slope 0.957 vs 0.491 naive
+
+The live Week 2 slate contains 26 defenses, all mapped. DEF remains a mean model only; tail outcomes will require future simulation.
