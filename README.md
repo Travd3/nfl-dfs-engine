@@ -181,7 +181,7 @@ Future major components still to build include:
 
 - live V3 inference for the 2026 FanDuel slate
 - non-multiplicative conditional-production research after the first live test
-- FanDuel optimizer + minimal test interface
+- final pre-lock injury/inactive refresh and submission snapshot
 - DraftKings salary/player-ID ingest
 - verified final live injury/status ingest
 - game simulation
@@ -204,3 +204,17 @@ Corrected rolling-origin result:
 - calibration slope 0.957 vs 0.491 naive
 
 The live Week 2 slate contains 26 defenses, all mapped. DEF remains a mean model only; tail outcomes will require future simulation.
+
+
+### Test Slate #1 optimizer
+
+The first end-to-end FanDuel test path is now committed.
+
+- `optimizer.py` solves the exact $60,000, 9-player FanDuel roster.
+- `web/index.html` is the static test interface.
+- `fanduel_export.py` fills the user's original FanDuel upload template locally without committing private entry/contest identifiers.
+- Ten distinct legal lineups are generated so the user can see mean-projection sensitivity rather than relying on one brittle optimum.
+
+Current top lineup from the archived pre-lock snapshot projects 119.45 points at exactly $60,000. Chris Olave is Questionable and remains visibly flagged for pre-lock review.
+
+The only operational blocker before submission is the final injury/inactive refresh and optimizer rerun.
