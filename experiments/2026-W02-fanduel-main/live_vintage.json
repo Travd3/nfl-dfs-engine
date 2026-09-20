@@ -1,0 +1,20 @@
+{
+  "generated_utc": "2026-09-20T00:38:15.968936+00:00",
+  "nflreadpy": "0.1.5",
+  "slate_season": 2026,
+  "slate_week": 2,
+  "pbp_max_week": 2,
+  "weekly_stats_max_week": 2,
+  "rosters_max_week": 2,
+  "trained_through_week": 1,
+  "slate_file": "FanDuel_2026-09-20_player_pool_sanitized.csv",
+  "slate_players": 652,
+  "skill_player_rows": 626,
+  "mapped_projected": 332,
+  "no_history": 73,
+  "inactive_or_practice_squad": 201,
+  "position_mismatch": 10,
+  "unresolved": 10,
+  "games": 13,
+  "live_projections_sha256": "8ebf12feb8723adf388cc586f96f75f486aec4b64b74653b5f5c671c8d53f990"
+}
