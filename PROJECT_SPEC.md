@@ -428,49 +428,53 @@ Current lesson:
 
 ### FanDuel DEF baseline
 
-`def_scoring.py` and `team_defense.py` now implement the first transparent
+`def_scoring.py` and `team_defense.py` implement the first transparent
 FanDuel DEF mean model.
 
-The actual Test Slate #1 screenshots verify:
-- blocked punts/kicks +2
-- blocked-kick return TD +6
-- fumble return TD +6
-- return TD +6
-- safety +2
-- extra-point return +2
-- fumble recovery +2
-- interception +2
-- sack +1
-- points allowed: 0 +10, 1-6 +7, 7-13 +4, 14-20 +1,
-  21-27 0, 28-34 -1, 35+ -4
+Test Slate #1 scoring provenance:
+- all non-zero DEF categories are visible in the actual contest Rules screenshots
+- Extra Point Return is +2
+- the contest note defines defensive points allowed from offensive scoring only,
+  so opponent defensive/special-teams TDs, defensive safeties, and defensive
+  conversion returns do not count toward the PA tier
+- the FanDuel UI omits the zero-valued 21-27 PA row; the model uses 0 for that
+  band, consistent with established FanDuel scoring references
 
-The contest note also defines FanDuel defensive points allowed as offensive
-scoring only:
+Corrected rolling-origin backtest reported by Claude, n=7,649 team-games:
 
 ```text
-6 * (Rushing TD + Receiving TD + Own fumbles recovered for TD)
-+ 2 * Two-point conversions
-+ Extra points
-+ 3 * Field goals
+arm        RMSE      MAE   Spearman     bias   calib slope   intercept
+naive    5.7547   4.4452     0.1388   +0.0359        0.491      +2.977
+model    5.5008   4.2347     0.3127   -0.0882        0.957      +0.336
+
+RMSE naive -> model +0.2540
+95% CI [+0.2136, +0.2939]
+P=1.000
+
+MAE naive -> model +0.2114
+95% CI [+0.1746, +0.2488]
+P=1.000
 ```
 
-Therefore opponent defensive/special-teams TDs, safeties, and defensive
-conversion returns must not move the points-allowed tier.
+The reported RMSE direction is positive in all 14 test seasons from 2012-2025.
+The corrected target was sanity-checked for double subtraction: 2023-2025 had
+zero negative points-allowed rows and 11.6% of team-games were changed by the
+D/ST-score removal.
 
-Claude's first DEF backtest used opponent final score as points allowed and
-omitted the +2 extra-point-return category. That first reported result
-(RMSE 5.5052 vs 5.7555 naive) and its 26 live projections are therefore
-**PROVISIONAL / SUPERSEDED FOR MODEL ACCEPTANCE**.
+Live Test Slate #1:
+- trained through fully completed 2026 Week 1 only
+- 26 defenses in the exact 13-game FanDuel slate
+- 26 mapped, 0 unmapped
+- highest mean projection: Tampa Bay 8.93
+- highest value tier includes Chicago 7.21 at $3,700, Carolina 6.44 at $3,300,
+  and Arizona 6.04 at $3,200
 
-The corrected code now:
-- marks the contest DEF profile verified
-- adds extra-point returns using nflverse `def_2pt_made`
-- removes opponent D/ST TDs, defensive safeties, and defensive conversion
-  returns from the points-allowed calculation
-- preserves the future-game null-target regression guard
+Current status: **PRODUCTION MEAN BASELINE FOR TEST SLATE #1**.
 
-Issue #4 remains open until the historical backtest and live Week 2 projections
-are rerun under this corrected scoring target.
+This remains a mean model, not a defense outcome distribution. The historical
+DEF target standard deviation is about 5.79 while the live means span only
+3.25-8.93, so tail outcomes such as shutout-plus-return-TD remain future
+simulation work.
 
 ---
 
@@ -541,11 +545,10 @@ RMSE is only an interim metric for point projections. It is not the final tourna
 ## 10. DFS roadmap
 
 ### Immediate
-1. Build live V3 inference for the official FanDuel Test Slate #1 player pool.
-2. Add a FanDuel DEF mean projection/scoring path.
-3. Build the first salary-cap optimizer for the 9-player, $60,000 FanDuel roster.
-4. Build a minimal test interface that shows projections, salary, value, and the recommended lineup.
-5. Complete reliable final game-status/inactive sourcing before Sunday lock.
+1. Build the first salary-cap optimizer for the 9-player, $60,000 FanDuel roster using the archived skill-player and DEF projection snapshots.
+2. Build a minimal test interface that shows projections, salary, value, injury/status flags, and the recommended lineup.
+3. Complete reliable final game-status/inactive sourcing before Sunday lock.
+4. Archive the final pre-lock lineup, salary used, projections, source vintage, and commit SHA.
 
 Conditional played-player modeling remains a parallel research task and must not
 delay the first live Sunday test.
@@ -686,7 +689,7 @@ No AI should silently create a separate competing architecture.
 - V3's gain is concentrated in zero-opportunity rows; it remains worse than naive on played rows and slightly worse on rank correlation.
 - The multiplicative availability hurdle was tested and rejected. A played-only conditional ridge showed a large diagnostic improvement, but no validated full-slate replacement model exists yet.
 - FanDuel rule values are verified, but historical target completeness remains false because `special_teams_tds` is broader than kickoff/punt return TDs and `fumble_recovery_tds` cannot isolate own recoveries.
-- FanDuel DEF scoring/model code is implemented, but Issue #4 remains open pending a rerun under the corrected screenshot-verified points-allowed definition and extra-point-return scoring.
+- FanDuel DEF scoring/model has passed the corrected rolling-origin rerun and is the production mean baseline for Test Slate #1.
 - The official FanDuel Test Slate #1 player pool is available through the upload-template ingest path.
 - `live_projection.py` is complete for Week 2 live QB/RB/WR/TE inference, including the fully-completed-week training guard and explicit mapping-status diagnostics.
 - Test Slate #1 skill-player mapping/inference is archived under `experiments/2026-W02-fanduel-main/`.
