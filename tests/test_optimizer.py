@@ -12,11 +12,17 @@ import polars as pl
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import optimizer as opt
 
-SKILL = "tables/live_projections.csv"
-DEF = "tables/live_def_projections.csv"
+LIVE_SKILL = "tables/live_projections.csv"
+LIVE_DEF = "tables/live_def_projections.csv"
+SNAPSHOT_SKILL = "experiments/2026-W02-fanduel-main/live_projections.csv"
+SNAPSHOT_DEF = "experiments/2026-W02-fanduel-main/live_def_projections.csv"
+
+SKILL = LIVE_SKILL if os.path.exists(LIVE_SKILL) else SNAPSHOT_SKILL
+DEF = LIVE_DEF if os.path.exists(LIVE_DEF) else SNAPSHOT_DEF
+
 pytestmark = pytest.mark.skipif(
     not (os.path.exists(SKILL) and os.path.exists(DEF)),
-    reason="run live_projection.py and team_defense.py first")
+    reason="live or archived Test Slate #1 projection tables are required")
 
 
 @pytest.fixture(scope="module")
