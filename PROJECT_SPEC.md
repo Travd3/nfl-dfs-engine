@@ -491,7 +491,9 @@ Issue #5 is complete.
 - $60,000 salary cap
 
 Objective for v1 is deliberately simple: maximize the sum of the accepted mean
-projections, with no ownership, correlation, or ceiling weighting.
+projections, with no ownership, correlation, or ceiling weighting. That result is
+now treated as the **mean/cash-style benchmark**, not the final first-place
+optimizer for tournament-style play.
 
 Eligibility:
 - `mapping_status == ok`
@@ -520,6 +522,19 @@ projected mean: 119.45
 Ten distinct legal lineups were generated with no-good cuts. The top-10 spread
 is only 1.15 projected points, so the current mean-only optimizer should not be
 interpreted as finding one uniquely superior lineup.
+
+Tournament construction note:
+- current Week 2 DFS industry guidance strongly favors pairing a tournament QB
+  with at least one same-team pass catcher
+- the existing Issue #5 lineup uses Trevor Lawrence without a Jacksonville
+  pass catcher, so it is not a correlation-aware tournament build
+- Issue #8 adds a separate correlation-aware optimizer mode rather than changing
+  the projection model
+- the first implementation will require QB + WR/TE, with optional bring-back;
+  it will report the mean-projection cost versus the unconstrained benchmark
+- do not hard-code expert favorite stacks as projection truth; use them as
+  external diagnostics while preserving our own player projections
+
 
 `web/index.html` is a self-contained static test UI with:
 - searchable/filterable player table
@@ -604,11 +619,12 @@ RMSE is only an interim metric for point projections. It is not the final tourna
 ## 10. DFS roadmap
 
 ### Immediate
-1. Refresh final injury/game-status information before Sunday lock.
-2. Apply official inactive IDs as they become available.
-3. Rerun the optimizer and rebuild the static page after any eligibility change.
-4. Archive the final submitted lineup, salary used, projections, source vintage, and commit SHA.
-5. Record actual lineup/contest results after the slate for operational validation.
+1. Add Issue #8 correlation-aware tournament mode while preserving the pure-mean benchmark.
+2. Refresh final injury/game-status information before Sunday lock.
+3. Apply official inactive IDs as they become available.
+4. Rerun both mean and correlation-aware optimizers after any eligibility change.
+5. Archive the final submitted lineup, salary used, projections, source vintage, and commit SHA.
+6. Record actual lineup/contest results after the slate for operational validation.
 
 Conditional played-player modeling remains a parallel research task and must not
 delay the first live Sunday test.
