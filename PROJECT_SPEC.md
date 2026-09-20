@@ -78,6 +78,14 @@ Production rule:
 - add a separate verified source for final Out/Doubtful/Questionable designations and official inactives
 - exclude TNF injury features from historical backtests until pre-lock snapshots exist, because a weekly row may reflect information added after Thursday kickoff
 
+Test Slate #1 optimizer policy:
+- Out = auto-exclude
+- Doubtful = auto-exclude for the first single-entry test
+- Questionable = keep eligible but visibly flag for final pre-lock review
+- newer official team/NFL game-status information can override a stale FanDuel flag when timestamped
+- official inactives auto-exclude
+- do not apply an unvalidated injury-based projection haircut; status eligibility is downstream from the pure V3 mean projection
+
 These claims are guarded by `tests/test_data_availability.py`.
 
 Sleeper may be useful as a same-day overlay, but its public API documentation says free use is for non-commercial purposes and commercial use requires contacting Sleeper. Do not make Sleeper a commercial product dependency without permission.
@@ -633,7 +641,8 @@ No AI should silently create a separate competing architecture.
 - FanDuel rule values are verified, but historical target completeness remains false because `special_teams_tds` is broader than kickoff/punt return TDs and `fumble_recovery_tds` cannot isolate own recoveries.
 - FanDuel DEF scoring/projection is not yet implemented.
 - The official FanDuel Test Slate #1 player pool is available through the upload-template ingest path.
-- `live_projection.py` is committed for Week 2 live QB/RB/WR/TE inference, including a fully-completed-week training guard. Final FanDuel mapping coverage still needs a run against the official slate CSV.
+- `live_projection.py` is complete for Week 2 live QB/RB/WR/TE inference, including the fully-completed-week training guard and explicit mapping-status diagnostics.
+- Test Slate #1 skill-player mapping/inference is archived under `experiments/2026-W02-fanduel-main/`.
 
 ---
 
