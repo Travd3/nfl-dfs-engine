@@ -476,6 +476,65 @@ DEF target standard deviation is about 5.79 while the live means span only
 3.25-8.93, so tail outcomes such as shutout-plus-return-TD remain future
 simulation work.
 
+### Test Slate #1 optimizer and site
+
+Issue #5 is complete.
+
+`optimizer.py` solves the exact FanDuel NFL Classic roster:
+- 1 QB
+- 2 RB
+- 3 WR
+- 1 TE
+- 1 FLEX from RB/WR/TE
+- 1 DEF
+- 9 total players
+- $60,000 salary cap
+
+Objective for v1 is deliberately simple: maximize the sum of the accepted mean
+projections, with no ownership, correlation, or ceiling weighting.
+
+Eligibility:
+- `mapping_status == ok`
+- Out / Doubtful / IR / NA excluded
+- Questionable / GTD remain eligible and are flagged
+- official inactive IDs can be supplied pre-lock
+- no injury projection haircut
+
+The first optimized lineup from the archived Week 2 snapshot is:
+
+```text
+QB   Trevor Lawrence        7800   18.87
+RB   Bijan Robinson         8900   19.96
+RB   Ashton Jeanty          7700   15.26
+FLEX Chase Brown            7600   14.73
+WR   Chris Olave            7900   14.03   Q
+WR   Michael Wilson         6000   10.48
+WR   Wan'Dale Robinson      5300   10.40
+TE   Harold Fannin Jr.      5500    9.28
+DEF  Carolina Panthers      3300    6.44
+
+salary: 60,000
+projected mean: 119.45
+```
+
+Ten distinct legal lineups were generated with no-good cuts. The top-10 spread
+is only 1.15 projected points, so the current mean-only optimizer should not be
+interpreted as finding one uniquely superior lineup.
+
+`web/index.html` is a self-contained static test UI with:
+- searchable/filterable player table
+- salary, projection, and value
+- status badges
+- recommended lineup and 10 alternates
+- salary used/remaining and projected total
+- client-side legality check
+- unavailable/unprojected-player panel
+
+`fanduel_export.py` fills an existing original FanDuel upload template locally
+without committing its private entry/contest identifiers. The raw template
+remains outside the public repository.
+
+
 ---
 
 ## 8. Baseline model status
@@ -545,10 +604,11 @@ RMSE is only an interim metric for point projections. It is not the final tourna
 ## 10. DFS roadmap
 
 ### Immediate
-1. Build the first salary-cap optimizer for the 9-player, $60,000 FanDuel roster using the archived skill-player and DEF projection snapshots.
-2. Build a minimal test interface that shows projections, salary, value, injury/status flags, and the recommended lineup.
-3. Complete reliable final game-status/inactive sourcing before Sunday lock.
-4. Archive the final pre-lock lineup, salary used, projections, source vintage, and commit SHA.
+1. Refresh final injury/game-status information before Sunday lock.
+2. Apply official inactive IDs as they become available.
+3. Rerun the optimizer and rebuild the static page after any eligibility change.
+4. Archive the final submitted lineup, salary used, projections, source vintage, and commit SHA.
+5. Record actual lineup/contest results after the slate for operational validation.
 
 Conditional played-player modeling remains a parallel research task and must not
 delay the first live Sunday test.
@@ -682,7 +742,6 @@ No AI should silently create a separate competing architecture.
 - No contest simulator is currently committed here.
 - No ownership model is currently committed here.
 - Injury practice-status data is verified live, but final game-status/inactive sourcing and timestamped snapshot archiving are not yet implemented.
-- No frontend is currently committed here.
 - FTN publication lag is source-vintage dependent; the live canary currently supports a 1-week lag and will fail when the observed gap changes.
 - Current route-level information is unavailable in the free stack.
 - Direct-ridge Baseline V3 has passed a fresh 2011-2017 RMSE confirmation and is the interim production mean baseline.
@@ -693,6 +752,7 @@ No AI should silently create a separate competing architecture.
 - The official FanDuel Test Slate #1 player pool is available through the upload-template ingest path.
 - `live_projection.py` is complete for Week 2 live QB/RB/WR/TE inference, including the fully-completed-week training guard and explicit mapping-status diagnostics.
 - Test Slate #1 skill-player mapping/inference is archived under `experiments/2026-W02-fanduel-main/`.
+- The FanDuel v1 optimizer, static test interface, and local upload-template exporter are committed. Final pre-lock status refresh remains the operational blocker before submission.
 
 ---
 
