@@ -111,3 +111,28 @@ Archived:
 Scoring provenance note:
 - all non-zero DEF categories and the FanDuel points-allowed formula are visible in the actual contest screenshots
 - the UI omits the zero-valued 21-27 points-allowed row; the model uses 0 for that band, consistent with long-standing FanDuel scoring references
+
+
+## Optimizer snapshot
+
+First mean-only optimizer run:
+
+```text
+QB   Trevor Lawrence       JAC   DEN   7800   18.87
+RB   Bijan Robinson        ATL   CAR   8900   19.96
+RB   Ashton Jeanty         LV    LAC   7700   15.26
+FLEX Chase Brown           CIN   HOU   7600   14.73
+WR   Chris Olave           NO    BAL   7900   14.03   Q
+WR   Michael Wilson        ARI   SEA   6000   10.48
+WR   Wan'Dale Robinson     TEN   PHI   5300   10.40
+TE   Harold Fannin Jr.     CLE   TB    5500    9.28
+DEF  Carolina Panthers     CAR   ATL   3300    6.44
+
+salary used: 60,000
+salary remaining: 0
+projected mean: 119.45
+```
+
+Top-10 lineup projection range: 119.45 to 118.30, a 1.15-point spread.
+
+The page and optimizer outputs are pre-lock test artifacts only. The final submitted lineup must be regenerated after the last injury/inactive refresh.
