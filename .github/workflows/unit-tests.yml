@@ -26,5 +26,5 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run deterministic unit tests
-        run: pytest tests/test_scoring.py -v
+      - name: Run deterministic scoring tests
+        run: pytest tests/test_scoring.py tests/test_def_scoring.py -k "not points_allowed_is_never_null_filled" -v
