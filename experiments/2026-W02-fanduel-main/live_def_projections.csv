@@ -1,0 +1,27 @@
+fanduel_id,defense,team,opponent,game,salary,def_projection,pts_per_1k,opp_implied_total,team_spread,injury_indicator,mapping_status
+134251-12551,Tampa Bay Buccaneers,TB,CLE,CLE@TB,4800,8.93,1.86,16.5,8.5,"",ok
+134251-12555,Baltimore Ravens,BAL,NO,NO@BAL,4600,7.54,1.639,18.5,8.5,"",ok
+134251-12548,Los Angeles Chargers,LAC,LV,LV@LAC,4500,7.41,1.647,18.5,6.5,"",ok
+134251-12545,Philadelphia Eagles,PHI,TEN,PHI@TEN,4900,7.24,1.477,16.25,7.0,"",ok
+134251-12527,Chicago Bears,CHI,MIN,MIN@CHI,3700,7.21,1.949,21.5,4.5,"",ok
+134251-12549,San Francisco 49ers,SF,MIA,MIA@SF,5000,7.11,1.423,15.5,13.5,"",ok
+134251-12550,Seattle Seahawks,SEA,ARI,SEA@ARI,4700,6.64,1.413,18.5,3.5,"",ok
+134251-12553,Carolina Panthers,CAR,ATL,CAR@ATL,3300,6.44,1.952,20.5,2.5,"",ok
+134251-12525,Atlanta Falcons,ATL,CAR,CAR@ATL,3400,6.2,1.825,23.0,-2.5,"",ok
+134251-12547,Pittsburgh Steelers,PIT,NE,PIT@NE,4300,6.08,1.415,23.5,-5.5,"",ok
+134251-12531,Denver Broncos,DEN,JAC,JAC@DEN,4200,6.08,1.447,21.25,3.0,"",ok
+134251-12556,Houston Texans,HOU,CIN,CIN@HOU,4000,6.04,1.511,21.5,2.5,"",ok
+134251-12546,Arizona Cardinals,ARI,SEA,SEA@ARI,3200,6.04,1.887,22.0,-3.5,"",ok
+134251-12533,Green Bay Packers,GB,NYJ,GB@NYJ,4400,6.03,1.37,20.5,3.5,"",ok
+134251-12530,Dallas Cowboys,DAL,WAS,WAS@DAL,3600,5.64,1.565,23.5,3.5,"",ok
+134251-12528,Cincinnati Bengals,CIN,HOU,CIN@HOU,3500,5.36,1.532,24.0,-2.5,"",ok
+134251-12537,Las Vegas Raiders,LV,LAC,LV@LAC,3400,5.3,1.558,25.0,-6.5,"",ok
+134251-12529,Cleveland Browns,CLE,TB,CLE@TB,3200,5.13,1.605,25.0,-8.5,"",ok
+134251-12534,Tennessee Titans,TEN,PHI,PHI@TEN,3000,4.65,1.55,23.25,-7.0,"",ok
+134251-12541,New England Patriots,NE,PIT,PIT@NE,4100,4.57,1.115,18.0,5.5,"",ok
+134251-12554,Jacksonville Jaguars,JAC,DEN,JAC@DEN,3900,4.52,1.158,24.25,-3.0,"",ok
+134251-12540,Minnesota Vikings,MIN,CHI,MIN@CHI,3800,4.18,1.1,26.0,-4.5,"",ok
+134251-12544,New York Jets,NYJ,GB,GB@NYJ,3100,4.07,1.314,24.0,-3.5,"",ok
+134251-12542,New Orleans Saints,NO,BAL,NO@BAL,3100,4.02,1.296,27.0,-8.5,"",ok
+134251-12552,Washington Commanders,WAS,DAL,WAS@DAL,3300,3.84,1.165,27.0,-3.5,"",ok
+134251-12539,Miami Dolphins,MIA,SF,MIA@SF,3000,3.25,1.082,29.0,-13.5,"",ok
